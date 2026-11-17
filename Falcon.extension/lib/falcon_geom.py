@@ -19,6 +19,7 @@ the Revit tools pass feet.
 """
 
 import math
+import re
 
 MM_PER_FT = 304.8
 
@@ -539,3 +540,108 @@ def upper_edges(center, upper_dir, radius, length):
         edges.append(((center[0] + ox - u[0] * half, center[1] + oy - u[1] * half, center[2]),
                       (center[0] + ox + u[0] * half, center[1] + oy + u[1] * half, center[2])))
     return edges
+
+
+# ------------------------------------------------------------- auto flex
+
+# Short words must be whole words ("end" not in "pendant"); long ones may
+# be glued to others ("JBCross", "TwoWay").
+_OUTLET_WORDS = (
+    ("fourway", 4), ("cross", 4),
+    ("threeway", 3), ("tee", 3),
+    ("twoway", 2), ("through", 2), ("thru", 2), ("straight", 2), ("inline", 2),
+    ("oneway", 1), ("end", 1), ("dead", 1),
+)
+
+
+def outlets_from_name(name):
+    """Outlet count a junction box type name implies, or None.
+
+    Works with any naming: "Tee (3-way)", "Cross", "2 Way", "Through",
+    "JB_4-WAY", "End". An explicit "N-way" number wins over a word."""
+    text = (name or "").lower()
+    digits = ""
+    for i, ch in enumerate(text + " "):
+        if ch.isdigit():
+            digits += ch
+            continue
+        if digits:
+            rest = "".join(c for c in text[i:i + 5] if c.isalpha())
+            if rest.startswith("way"):
+                return int(digits)
+            digits = ""
+    words = re.findall("[a-z]+", text)
+    squashed = "".join(words)
+    for word, count in _OUTLET_WORDS:
+        if word in words or (len(word) >= 5 and word in squashed):
+            return count
+    return None
+
+
+def box_capacity(connector_count, name):
+    """Usable outlets of a box type: its conduit connectors, capped by the
+    count its name implies (a 'Tee' type of a 4-connector family is 3)."""
+    named = outlets_from_name(name)
+    if named is None:
+        return connector_count
+    return min(connector_count, named)
+
+
+def pick_bigger_type(needed, candidates):
+    """Key of the candidate with the fewest outlets that still has at least
+    `needed` outlets; None when none has enough.
+
+    candidates: [(key, outlets)]. Order breaks ties (put same-family
+    types first), so Through -> Tee -> Cross steps up one at a time."""
+    best = None
+    for key, outlets in candidates:
+        if outlets < needed:
+            continue
+        if best is None or outlets < best[1]:
+            best = (key, outlets)
+    return best[0] if best else None
+
+
+def nearest_index(origin, points):
+    """Index of the point nearest origin in plan (height breaks ties);
+    None for an empty list."""
+    best = None
+    for i, p in enumerate(points):
+        key = (round(_plan_dist(origin, p), 6), abs(p[2] - origin[2]))
+        if best is None or key < best[0]:
+            best = (key, i)
+    return best[1] if best else None
+
+
+def best_outlet(directions, toward):
+    """Index of the outlet direction that points most toward `toward`
+    (a vector box -> target). A downward outlet wins a tie."""
+    aim = vnorm(toward) if vlen(toward) > 1e-9 else (0.0, 0.0, -1.0)
+    best = None
+    for i, d in enumerate(directions):
+        u = vnorm(d)
+        key = (round(vdot(u, aim), 6), -u[2])
+        if best is None or key > best[0]:
+            best = (key, i)
+    return best[1] if best else None
+
+
+def flex_points(start, out_dir, end, lead):
+    """Flex path from a box outlet to a fixture.
+
+    Leaves the outlet straight for `lead`, then drops (or rises) into the
+    fixture vertically, so the flex reads like a real whip. Returns
+    (points, start_tangent, end_tangent)."""
+    out = vnorm(out_dir)
+    down = -1.0 if end[2] <= start[2] else 1.0
+    # a box sitting right on the fixture gets a shorter lead, so the
+    # flex never overshoots the fixture and comes back
+    lead = min(lead, vlen(vsub(end, start)) / 3.0)
+    p1 = vadd(start, vscale(out, lead))
+    p2 = (end[0], end[1], end[2] - down * lead)
+    pts = [start, p1]
+    beyond = (p2[2] - p1[2]) * down > 1e-6
+    if beyond and vlen(vsub(p2, p1)) > lead * 0.5:
+        pts.append(p2)
+    pts.append(end)
+    return pts, out, (0.0, 0.0, down)

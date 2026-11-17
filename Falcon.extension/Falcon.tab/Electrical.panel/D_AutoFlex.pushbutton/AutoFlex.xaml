@@ -1,0 +1,14 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Auto Flex" Width="300" SizeToContent="Height"
+        ResizeMode="NoResize" WindowStartupLocation="CenterScreen" ShowInTaskbar="False">
+    <StackPanel Margin="14">
+        <TextBlock Text="Flex Diameter (mm)" FontWeight="SemiBold"/>
+        <ComboBox x:Name="diameter" Height="24" Margin="0,4,0,12"/>
+
+        <TextBlock x:Name="info" Foreground="Gray" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,10"
+                   Text="Each selected box gets a flex to its nearest light fixture. A box with every outlet taken is switched to a type with one more outlet."/>
+
+        <Button Content="Select Ceiling Box" Height="28" IsDefault="True" Click="select_click"/>
+    </StackPanel>
+</Window>

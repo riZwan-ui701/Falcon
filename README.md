@@ -9,12 +9,14 @@ and conduit automation (pull boxes, crossing offsets).
 
 ## Ribbon layout
 
-The **Falcon** tab uses compact small buttons, stacked three high:
+The **Falcon** tab uses compact small buttons, stacked three high. Panels run
+**Parameters → Electrical → Graphics** (set by `Falcon.tab/bundle.yaml`).
 
-| Panel | Column 1 | Column 2 | Column 3 |
-|---|---|---|---|
-| **Electrical** | Connect Conduit, Convert Line, Multi Fillet | Junction Box, Pull Box, Conduit Cutter | Auto Dimension, Home Run, Line Cutter |
-| **Graphics** | Coloring, **Markup ▾** (Redline Markup, Blue Markup, Clear) | | |
+| Panel | Column 1 | Column 2 | Column 3 | Column 4 |
+|---|---|---|---|---|
+| **Parameters** | Add Param (large) | | | |
+| **Electrical** | Connect Conduit, Convert Line, Multi Fillet | Junction Box, Pull Box, Conduit Cutter | Auto Dimension, Home Run, Line Cutter | Auto Flex (large) |
+| **Graphics** | Coloring, **Markup ▾** (Redline Markup, Blue Markup, Clear) | | | |
 
 ## Markup (Graphics panel → Markup ▾)
 
@@ -69,7 +71,64 @@ Click it and choose:
 - **Color Element** — pick elements (or pre-select them); they are colored in
   the current view and in every 3D view. Esc to finish.
 
+## Parameters panel
+
+### Add Param
+Adds a shared parameter to any loaded family without opening and editing each
+family by hand.
+
+1. **Choose families / types** — type in the search box (e.g. `eurs`) to
+   filter the Category → Family → Type tree.
+   - Tick a **family** → **instance** parameter (Properties palette, tags,
+     schedules).
+   - Tick only some **types** → **type** parameter; the optional value is set
+     on those types only.
+   The counter shows how many families and types are ticked.
+2. **Parameter** — name, data type (Text, Integer, Number, Length in mm, Area
+   in m², Volume in m³, Angle in °, Yes/No, URL) and the group it shows under
+   in the Properties palette (Identity Data, Data, Electrical - Lighting …).
+   **Value for the ticked types** is optional.
+3. **Add Parameter** — the log shows "Working… Revit is editing and reloading
+   N family(ies)", then one line per family. Families that already have a
+   parameter with that name are left alone.
+
+The parameter is a true **shared** parameter. It comes from the shared
+parameter file set in Revit (Manage → Shared Parameters); a name already in
+the file is reused, a new one is created in a **Falcon** group. If Revit has
+no file set, `%APPDATA%\Falcon\Falcon_SharedParameters.txt` is used for the run
+and Revit's setting is put back afterwards. Reloading keeps all existing
+parameter values in the project. The dialog remembers the last data type and
+group.
+
 ## Electrical panel
+
+### Auto Flex
+Pick the **Flex Diameter (mm)** (20–300, remembered), press **Select Ceiling
+Box**, select the ceiling junction boxes (boxes already selected stay in the
+pick) and press **Finish**. For every box:
+
+- a flex (Revit flex pipe) is drawn from the box to its **nearest light
+  fixture** (nearest in plan): it leaves the free outlet that points most
+  toward the fixture, then drops onto the top of the fixture;
+- if **every outlet is already taken by conduit**, the box is switched to a
+  type with **one more outlet** (Through → Tee → Cross). Its conduits stay
+  connected — the box is turned/slid so each conduit meets an outlet and the
+  conduit ends are trimmed onto them — and the flex leaves from the new outlet;
+- a box that already has a flex on one of its outlets is skipped, so running
+  it twice does not double up.
+
+Works with **any junction box family**: outlets are counted from the family's
+conduit connectors, capped by what the type name says (`Tee`, `Cross`,
+`Through`, `3-way`, `4 Way` …). The bigger type is looked for in the same
+family first, then in other box families of the same category and conduit
+size. Each box is all-or-nothing; the result dialog shows **Flex created**,
+**Boxes switched to a type with an extra outlet** and **Skipped / failed**
+with the reason for each skipped box. The whole run is one undo step.
+
+The flex uses the project's first flex pipe type (a "Round" one if there is
+one) and first piping system type — Revit has no flex conduit, so a flex pipe
+is the usual stand-in; it is drawn to the outlet but can't be "connected" to a
+conduit connector.
 
 ### Pull Box
 Fill in the dialog — distance between pull boxes (default 15 m), bends before
@@ -148,8 +207,8 @@ the gap each side of the upper conduit (default 50 mm).
 3. **Save Settings**, then fully close and reopen Revit (a plain
    **Reload** is not enough after adding a new extension directory for the
    first time).
-4. The **Falcon** tab should appear with the **Electrical** and **Graphics**
-   panels.
+4. The **Falcon** tab should appear with the **Parameters**, **Electrical**
+   and **Graphics** panels.
 
 ## Structure
 
@@ -169,6 +228,7 @@ Falcon.extension/
         A_AutoDimension.pushbutton/ (config.py)
         B_HomeRun.pushbutton/       (config.py)
         C_LineCutter.pushbutton/    (config.py)
+      D_AutoFlex.pushbutton/        (large button)
     Graphics.panel/
       A.stack/
         A_Coloring.pushbutton/
@@ -176,9 +236,12 @@ Falcon.extension/
           A_RedlineMarkup.pushbutton/
           B_BlueMarkup.pushbutton/
           C_Clear.pushbutton/
+    Parameters.panel/
+      A_AddParam.pushbutton/        (large button)
+    bundle.yaml                     (panel order)
   lib/
     falcon_markup.py               (Markup tools)
-    falcon_geom.py, falcon_naming.py          (pure maths/naming - tested offline)
+    falcon_geom.py, falcon_naming.py, falcon_params.py  (pure - tested offline)
     falcon_conduit.py, falcon_color.py        (Revit conduit and colour helpers)
     falcon_settings.py                   (remembered settings)
     falcon_view.py                       (plan-view / annotation helpers)
@@ -192,7 +255,8 @@ can't open files whose full path is longer than 260 characters, and
 
 ## Offline tests
 
-The maths behind Pull Box and Conduit Cutter runs without Revit:
+The maths behind Pull Box, Conduit Cutter and Auto Flex, and the Add Param
+rules, run without Revit:
 
 ```
 python -m venv .venv

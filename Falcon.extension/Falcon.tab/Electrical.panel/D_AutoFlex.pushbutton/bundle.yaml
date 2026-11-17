@@ -1,0 +1,8 @@
+title: Auto Flex
+tooltip: >-
+  Select ceiling junction boxes; each one gets a flex down to its nearest
+  light fixture. If every outlet of a box is already taken by conduit, the
+  box is switched to a type with one more outlet (Through -> Tee -> Cross),
+  its conduits stay connected and the flex leaves from the new outlet.
+  Works with any junction box family. Falcon.
+author: Rizwan Zahid

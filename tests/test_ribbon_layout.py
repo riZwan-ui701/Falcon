@@ -24,13 +24,28 @@ def titles(folder):
 
 
 def test_panels():
-    assert children(TAB) == ["Electrical.panel", "Graphics.panel"]
+    assert children(TAB) == ["Electrical.panel", "Graphics.panel", "Parameters.panel"]
+
+
+def test_tab_layout_puts_parameters_first():
+    with open(os.path.join(TAB, "bundle.yaml"), encoding="utf-8") as f:
+        order = [line.strip()[2:] for line in f if line.strip().startswith("- ")]
+    assert order == ["Parameters", "Electrical", "Graphics"]
+
+
+def test_parameters_panel():
+    panel = os.path.join(TAB, "Parameters.panel")
+    assert children(panel) == ["A_AddParam.pushbutton"]
+    assert titles(panel) == ["Add Param"]
 
 
 def test_electrical_stacks_in_order():
     panel = os.path.join(TAB, "Electrical.panel")
-    stacks = children(panel)
-    assert all(s.endswith(".stack") for s in stacks)
+    stacks = [d for d in children(panel) if d.endswith(".stack")]
+    assert [d for d in children(panel) if not d.endswith(".stack")] == [
+        "D_AutoFlex.pushbutton"]
+    with open(os.path.join(panel, "D_AutoFlex.pushbutton", "bundle.yaml"), encoding="utf-8") as f:
+        assert f.readline().strip() == "title: Auto Flex"
     assert [titles(os.path.join(panel, s)) for s in stacks] == [
         ["Connect Conduit", "Convert Line", "Multi Fillet"],
         ["Junction Box", "Pull Box", "Conduit Cutter"],
@@ -53,6 +68,8 @@ def test_graphics_stack_with_markup_pulldown():
 def test_every_stack_has_two_or_three_items():
     for panel in children(TAB):
         for stack in children(os.path.join(TAB, panel)):
+            if not stack.endswith(".stack"):
+                continue
             n = len(children(os.path.join(TAB, panel, stack)))
             assert 2 <= n <= 3, (panel, stack, n)
 
@@ -65,7 +82,7 @@ def test_every_button_is_complete():
             assert {"script.py", "bundle.yaml", "icon.png"} <= set(files), root
         if root.endswith(".pulldown"):
             assert {"bundle.yaml", "icon.png"} <= set(files), root
-    assert found == 13
+    assert found == 15
 
 
 def test_paths_fit_windows_limit_in_main_folder():
