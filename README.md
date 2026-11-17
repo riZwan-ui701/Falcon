@@ -137,6 +137,10 @@ Wires a run of outlets and does the paperwork. The dialog (remembered):
   DB. Off: you click the first outlet.
 - **Run order** — Shortest, **Clockwise** or **Anticlockwise** round the
   outlets from the first one.
+- **Switch** — tick **Add a light switch** and, after the lights, click the
+  switch (Esc skips it). It is wired to the nearest light in the run's style
+  and colour, and the same **Switch ID** ("auto" = next free letter a, b,
+  c…) goes on the switch and every light of the run.
 - No line runs along another one already drawn, and the tag is moved clear
   past the arrow tip so it never sits on the arrow or the wire.
 
