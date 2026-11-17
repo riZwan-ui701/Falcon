@@ -171,10 +171,32 @@ type's fitting settings.
 **Shift+click** Conduit Cutter to change the clearance (mm) and elbow angle.
 
 ### Junction Box
-Pick the box type (your last one is listed first), then click conduits. A
-click mid-run places the box there — a 2-way box cuts the conduit and is
-connected to both sides. A click within 300 mm of a conduit end puts the box
-on the end and connects it. Esc to finish.
+Type the **Elevation** (mm above the plan's level, remembered), press
+**Start**, select the fixtures (pre-selected ones are kept) and **Finish**.
+At each fixture the tool reads the routing lines in the view — detail and
+model lines, wires and CAD lines — that cross the fixture outline, and from
+the directions they leave in picks the box type and turns it to match:
+
+| Lines leaving the fixture | Box type |
+|---|---|
+| 1 | Terminal (1-way) |
+| 2 straight on | Through (2-way 180) |
+| 2 at an angle | Angle (2-way 90) |
+| 3 with two in line | Tee (3-way) |
+| 3 otherwise | Branch_Y |
+| 4 | Cross (4-way) |
+
+Types are recognised by their names, so any box family named like this works;
+the family that covers the most of the needed types is used. The box goes at
+the fixture's insertion point; a box already there is updated (type, turn,
+elevation) instead of doubled. The report lists boxes placed/updated, the
+elevation, family and types used, and every skipped fixture with the reason
+(e.g. no route line crosses its outline, nearest line 260.5 mm away). The plan
+is zoomed to the placement points. One undo step.
+
+**Shift+click** runs the original Junction Box: pick the box type, then click
+conduits — mid-run a 2-way box cuts the conduit and connects; within 300 mm
+of an end the box goes on the end. Esc to finish.
 
 ### Convert Line
 Turns detail lines into conduits in one click. The dialog:
@@ -227,10 +249,17 @@ a `Panel-Circuit` text note (e.g. `LP-1-3,5`). Devices with no circuit are
 listed and skipped. **Shift+click** to set the arrow length (default 600 mm).
 
 ### Auto Dimension (plan views)
-Dimensions the selected conduits — or every conduit in the view — to the
-nearest parallel grid (or wall face if no grid is within 10 m). Side-by-side
-conduits get one dimension string. **Shift+click** to set how far from the
-conduit midpoint the dimension sits (default 500 mm).
+Choose the **linear dimension type** (tick **Show all styles** for every
+dimension style), **Use Style**, then select the outlets (pre-selected ones
+are kept) and **Finish**. Outlets whose centres line up (within 100 mm) get
+one dimension chain through their centre references — one per row, one per
+column — 450 mm from the outlets. The report gives dimensions created, groups
+skipped (an outlet alone in its row/column), the segment values per chain,
+families with no usable centre reference, and any dimension errors.
+
+**Shift+click** offers: **Dimension conduits to grids** (the original tool —
+selected conduits, or all in the view, to the nearest parallel grid or wall)
+and the two distances.
 
 ### Line Cutter (plan views)
 Where one conduit passes over another, a small white "Falcon Mask" region hides
@@ -260,11 +289,11 @@ Falcon.extension/
         B_ConvertLine.pushbutton/
         C_MultiFillet.pushbutton/
       B.stack/
-        A_JunctionBox.pushbutton/
+        A_JunctionBox.pushbutton/   (config.py = old click-on-conduit tool)
         B_PullBox.pushbutton/
         C_ConduitCutter.pushbutton/ (config.py = Shift+click settings)
       C.stack/
-        A_AutoDimension.pushbutton/ (config.py)
+        A_AutoDimension.pushbutton/ (config.py = conduits to grids + settings)
         B_HomeRun.pushbutton/       (config.py)
         C_LineCutter.pushbutton/    (config.py)
       D.stack/
@@ -282,7 +311,8 @@ Falcon.extension/
     bundle.yaml                     (panel order)
   lib/
     falcon_markup.py               (Markup tools)
-    falcon_geom.py, falcon_route.py, falcon_naming.py, falcon_params.py
+    falcon_geom.py, falcon_route.py, falcon_layout.py, falcon_naming.py,
+    falcon_params.py
                                    (pure - tested offline)
     falcon_conduit.py, falcon_color.py        (Revit conduit and colour helpers)
     falcon_settings.py                   (remembered settings)
@@ -298,6 +328,7 @@ can't open files whose full path is longer than 260 characters, and
 ## Offline tests
 
 The maths behind Pull Box, Conduit Cutter, Auto Flex, Home Run Guide,
+Junction Box, Auto Dimension,
 Convert Line and Connect Conduit, and the Add Param rules, run without Revit:
 
 ```

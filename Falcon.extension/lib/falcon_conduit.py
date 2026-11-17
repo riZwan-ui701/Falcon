@@ -346,6 +346,9 @@ def _set_offset_to(doc, inst, z):
     DB.ElementTransformUtils.MoveElement(doc, inst.Id, DB.XYZ(0, 0, delta))
 
 
+set_height = _set_offset_to
+
+
 def _rotate_about(doc, inst, point, angle):
     if abs(math.sin(angle)) > TOL or math.cos(angle) < 0:
         axis = DB.Line.CreateBound(point, point + DB.XYZ.BasisZ)
