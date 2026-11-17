@@ -476,12 +476,12 @@ def main():
     rects = [plan_rect(x, view) for x in outlets]
     centers = [(x.Location.Point.X, x.Location.Point.Y) for x in outlets]
     if o["run_order"] == "shortest":
-        order = falcon_wiring.order_run(centers, first, last)
+        order = falcon_wiring.order_run(centers, first, last, rects=rects)
     else:
         order = falcon_wiring.order_ring(centers, first,
                                          clockwise=o["run_order"] == "clockwise")
     if o["draw"] == "arc":
-        paths = arc_paths(outlets, order, centers)
+        paths = arc_paths(outlets, order, centers, rects)
     elif wall:
         paths = wall_paths(outlets, order, rects, o["wall_mode"])
     else:
@@ -553,15 +553,21 @@ def main():
     forms.alert(u"\n".join(head + report), title=TITLE)
 
 
-def arc_paths(outlets, order, centers):
+def arc_paths(outlets, order, centers, rects):
     """Revit-style arcs from fixture to fixture (connector to connector),
-    bowed away from the middle of the run."""
+    each bowed the way that passes over no other fixture and does not run
+    on top of an arc already drawn."""
     mid = (sum(c[0] for c in centers) / len(centers),
            sum(c[1] for c in centers) / len(centers))
+    size = min(max(r[2] - r[0], r[3] - r[1]) for r in rects)
+    drawn = []
     paths = []
     for a, b in zip(order, order[1:]):
         pa, pb = connector_xy(outlets[a]), connector_xy(outlets[b])
-        paths.append((a, ArcPath(falcon_wiring.arc_between(pa, pb, mid), b)))
+        others = [rects[k] for k in order if k not in (a, b)]
+        pts, poly = falcon_wiring.best_arc(pa, pb, mid, others, drawn, tol=0.25 * size)
+        drawn.append(poly)
+        paths.append((a, ArcPath(pts, b)))
     return paths
 
 
@@ -664,14 +670,28 @@ def place_clear(view, tag, before, tip, z):
     """Move the tag so its whole box sits past the arrow tip, with a small
     gap - never over the arrow or the wire."""
     doc.Regenerate()
-    box = tag.get_BoundingBox(view)
-    if box is None:
-        return
-    width, height = box.Max.X - box.Min.X, box.Max.Y - box.Min.Y
-    gap = falcon_geom.mm_to_ft(TAG_GAP_PAPER_MM) * max(view.Scale, 1)
-    spot = falcon_wiring.tag_spot(before, tip, width, height, gap)
+    scale = max(view.Scale, 1)
+    try:
+        text = tag.TagText
+    except Exception:
+        text = u""
+    est_w, est_h = [falcon_geom.mm_to_ft(v)
+                    for v in falcon_wiring.estimate_tag_size(text or u"XX-XX-XX/X0", scale)]
     head = tag.TagHeadPosition
-    centre = ((box.Min.X + box.Max.X) / 2.0, (box.Min.Y + box.Max.Y) / 2.0)
+    box = tag.get_BoundingBox(view)
+    sane = (box is not None and 1e-6 < box.Max.X - box.Min.X < 6 * est_w
+            and box.Max.Y - box.Min.Y < 6 * est_h)
+    if sane:
+        width = max(box.Max.X - box.Min.X, est_w)
+        height = max(box.Max.Y - box.Min.Y, est_h)
+        centre = ((box.Min.X + box.Max.X) / 2.0, (box.Min.Y + box.Max.Y) / 2.0)
+    else:
+        # Revit gave no box, or one that is not just the tag (it can take
+        # in the host wire): use the estimate, centred on the head
+        width, height = est_w, est_h
+        centre = (head.X, head.Y)
+    gap = falcon_geom.mm_to_ft(TAG_GAP_PAPER_MM) * scale
+    spot = falcon_wiring.tag_spot(before, tip, width, height, gap)
     # the head point need not be the box centre: shift by the difference
     tag.TagHeadPosition = DB.XYZ(head.X + spot[0] - centre[0],
                                  head.Y + spot[1] - centre[1], head.Z)

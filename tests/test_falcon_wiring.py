@@ -1,9 +1,11 @@
 import pytest
 
+import falcon_wiring
 from falcon_wiring import (order_run, order_ring, side_mid, hits, overlaps,
                            orthogonal_options, route_sides, route_points,
                            wall_ports, enter_leave, axis_of, phase_letter, lift,
-                           arc_points, arc_between, chamfer_home_run, tag_spot)
+                           arc_points, arc_between, chamfer_home_run, tag_spot,
+                           arc_polyline, best_arc, estimate_tag_size)
 
 
 def rect(cx, cy, half=0.5):
@@ -182,6 +184,49 @@ def test_tag_spot_clear_past_the_arrow_tip():
     # pointing down: clear by gap + half height
     spot = tag_spot((0, 0), (0, -1), width=4, height=1, gap=0.5)
     assert spot == pytest.approx((0, -2))
+
+
+USER_ROOM = [(x, -139) for x in (318, 475, 672, 829)] + \
+            [(x, -339) for x in (318, 475, 672, 829)]
+
+
+def user_rects(h=20):
+    return [(cx - h, cy - h, cx + h, cy + h) for cx, cy in USER_ROOM]
+
+
+def test_order_run_never_jumps_over_a_fixture():
+    # the screenshot: shortest order went T2 -> T1 -> T3, jumping over T2
+    rects = user_rects()
+    for first in range(8):
+        order = order_run(USER_ROOM, first, rects=rects)
+        for a, b in zip(order, order[1:]):
+            others = [r for k, r in enumerate(rects) if k not in (a, b)]
+            assert not any(falcon_wiring._crosses_rect(USER_ROOM[a], USER_ROOM[b], r)
+                           for r in others), (first, order)
+
+
+def test_best_arc_misses_fixtures_and_earlier_arcs():
+    rects = user_rects()
+    mid = (573, -239)
+    order = order_run(USER_ROOM, 4, rects=rects)          # start bottom-left
+    drawn = []
+    for a, b in zip(order, order[1:]):
+        others = [r for k, r in enumerate(rects) if k not in (a, b)]
+        pts, poly = best_arc(USER_ROOM[a], USER_ROOM[b], mid, others, drawn, tol=8)
+        assert not any(falcon_wiring._crosses_rect(p, q, r)
+                       for r in others for p, q in zip(poly, poly[1:]))
+        drawn.append(poly)
+
+
+def test_arc_polyline_passes_through_mid():
+    poly = arc_polyline((0, 0), (5, 2), (10, 0))
+    assert poly[0] == pytest.approx((0, 0)) and poly[-1] == pytest.approx((10, 0))
+    assert max(p[1] for p in poly) == pytest.approx(2, abs=0.1)
+
+
+def test_tag_size_estimate():
+    w, h = estimate_tag_size(u"DB-GF-02/R2", 50)
+    assert w > h > 0 and w == pytest.approx(len("DB-GF-02/R2") * h * 0.75, rel=0.01)
 
 
 def test_lift_and_arc():

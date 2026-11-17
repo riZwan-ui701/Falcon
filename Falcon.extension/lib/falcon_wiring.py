@@ -31,25 +31,63 @@ def _manhattan(a, b):
 
 # ----------------------------------------------------------- run order
 
-def _path_length(points, order):
-    return sum(_manhattan(points[a], points[b]) for a, b in zip(order, order[1:]))
+def _crosses_rect(a, b, rect):
+    """Does the straight segment a-b pass through the rectangle?"""
+    x0, y0, x1, y1 = rect
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, a[0] - x0), (dx, x1 - a[0]), (-dy, a[1] - y0), (dy, y1 - a[1])):
+        if abs(p) < 1e-12:
+            if q < 0:
+                return False
+            continue
+        r = q / p
+        if p < 0:
+            t0 = max(t0, r)
+        else:
+            t1 = min(t1, r)
+        if t0 > t1:
+            return False
+    return t1 - t0 > 1e-9
 
 
-def order_run(points, first, last=None):
+def _costs(points, rects):
+    """Cost of every hop: Manhattan length, plus a large penalty for each
+    other fixture the hop would pass over (so the run never jumps over a
+    fixture to reach one behind it)."""
+    n = len(points)
+    span = sum(_manhattan(points[0], p) for p in points) + 1.0
+    cost = [[0.0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(i + 1, n):
+            c = _manhattan(points[i], points[j])
+            if rects:
+                c += span * sum(1 for k, r in enumerate(rects)
+                                if k not in (i, j) and _crosses_rect(points[i], points[j], r))
+            cost[i][j] = cost[j][i] = c
+    return cost
+
+
+def order_run(points, first, last=None, rects=None):
     """Visit order (indices) for a run that starts at `first` and, when
     given, ends at `last`: nearest neighbour, then 2-opt until no swap
-    makes the run shorter. Distances are Manhattan, as the wiring only
-    runs horizontally and vertically."""
+    makes the run cheaper. Distances are Manhattan, as the wiring only
+    runs horizontally and vertically; with `rects` (the fixture outlines)
+    a hop that would pass over another fixture is heavily penalised."""
     n = len(points)
     if n == 0:
         return []
+    cost = _costs(points, rects)
+
+    def total(order):
+        return sum(cost[a][b] for a, b in zip(order, order[1:]))
     left = set(range(n)) - set([first])
     if last is not None and last != first:
         left.discard(last)
     order = [first]
     while left:
-        cur = points[order[-1]]
-        nxt = min(sorted(left), key=lambda i: _manhattan(cur, points[i]))
+        cur = order[-1]
+        nxt = min(sorted(left), key=lambda i: cost[cur][i])
         order.append(nxt)
         left.discard(nxt)
     if last is not None and last != first:
@@ -61,7 +99,7 @@ def order_run(points, first, last=None):
         for i in range(1, end - 1):
             for j in range(i + 1, end):
                 trial = order[:i] + order[i:j + 1][::-1] + order[j + 1:]
-                if _path_length(points, trial) < _path_length(points, order) - 1e-9:
+                if total(trial) < total(order) - 1e-9:
                     order = trial
                     improved = True
     return order
@@ -343,6 +381,68 @@ def arc_between(a, b, away_from, bulge=0.2):
     return [a, (mx + nx * d * bulge, my + ny * d * bulge), b]
 
 
+def arc_polyline(a, mid, b, n=16):
+    """Points along the circle arc through a, mid, b (straight if they line up)."""
+    ax, ay = a[0], a[1]
+    bx, by = mid[0], mid[1]
+    cx, cy = b[0], b[1]
+    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    if abs(d) < 1e-12:
+        return [a, b]
+    ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay)
+          + (cx * cx + cy * cy) * (ay - by)) / d
+    uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx)
+          + (cx * cx + cy * cy) * (bx - ax)) / d
+    r = math.hypot(ax - ux, ay - uy)
+    t0 = math.atan2(ay - uy, ax - ux)
+    tm = math.atan2(by - uy, bx - ux)
+    t1 = math.atan2(cy - uy, cx - ux)
+    # sweep from a to b the way that passes through mid
+    sweep = (t1 - t0) % (2 * math.pi)
+    if (tm - t0) % (2 * math.pi) > sweep:
+        sweep -= 2 * math.pi
+    return [(ux + r * math.cos(t0 + sweep * k / float(n)),
+             uy + r * math.sin(t0 + sweep * k / float(n))) for k in range(n + 1)]
+
+
+def _seg_dist(p, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    l2 = dx * dx + dy * dy
+    t = 0.0 if l2 < 1e-18 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2))
+    return math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)
+
+
+def _near_count(poly, drawn, tol, skip):
+    """Points of poly (ends skipped) closer than tol to a drawn polyline."""
+    count = 0
+    for p in poly[skip:len(poly) - skip]:
+        for line in drawn:
+            if any(_seg_dist(p, a, b) < tol for a, b in zip(line, line[1:])):
+                count += 1
+                break
+    return count
+
+
+def best_arc(a, b, away_from, obstacles, drawn, tol):
+    """Revit-style arc a -> b that passes over no other fixture and does not
+    run on top of an arc already drawn. Tries both sides and several bows;
+    fewest fixtures crossed, then fewest close points, then the bow
+    nearest the usual one wins. Returns (3 points, sampled polyline)."""
+    best = None
+    for bulge in (0.2, -0.2, 0.12, -0.12, 0.32, -0.32, 0.05, -0.05):
+        pts = arc_between(a, b, away_from, bulge=abs(bulge))
+        if bulge < 0:
+            mx, my = (a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0
+            pts = [a, (2 * mx - pts[1][0], 2 * my - pts[1][1]), b]
+        poly = arc_polyline(pts[0], pts[1], pts[2])
+        crossed = sum(1 for r in obstacles
+                      if any(_crosses_rect(p, q, r) for p, q in zip(poly, poly[1:])))
+        key = (crossed, _near_count(poly, drawn, tol, 2), abs(abs(bulge) - 0.2), bulge < 0)
+        if best is None or key < best[0]:
+            best = (key, pts, poly)
+    return best[1], best[2]
+
+
 def chamfer_home_run(start, toward, length):
     """Home run with square corners: along the main axis toward the panel,
     then a short leg across. Three points."""
@@ -354,6 +454,14 @@ def chamfer_home_run(start, toward, length):
     sy = math.copysign(length * 0.7, dy or 1.0)
     sx = math.copysign(length * 0.3, dx or 1.0)
     return [start, (start[0], start[1] + sy), (start[0] + sx, start[1] + sy)]
+
+
+def estimate_tag_size(text, scale, text_mm=2.5):
+    """Model-size (mm) estimate of a one-line tag when Revit cannot report
+    its box: text height on paper times the view scale, about 0.75 of the
+    height per character."""
+    h = text_mm * max(scale, 1)
+    return max(len(text or u""), 1) * h * 0.75, h
 
 
 def tag_spot(before, tip, width, height, gap):
