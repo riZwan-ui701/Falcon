@@ -7,7 +7,7 @@
 #                  a power circuit on a panel (with its panel schedule), an
 #                  arc home-run wire and a circuit tag at the first outlet.
 # Author         : Rizwan Zahid
-# Version        : 1.1.1
+# Version        : 1.1.2
 # Created Date   : 2026-11-17
 # Updated Date   : 2026-11-17
 # Status         : Production
@@ -48,6 +48,9 @@
 #
 # Changelog
 # ------------------------------------------------------------
+# v1.1.2
+#   - Faster: one model refresh per run (was 4-5); Switch IDs read in one
+#     pass; the result pop-up ends with the time of each step.
 # v1.1.1
 #   - No <unnamed> circuits: a panel-less circuit is connected to the chosen
 #     panel; a new circuit is created and connected all-or-nothing.
@@ -69,6 +72,7 @@
 
 import math
 import os
+import time
 import traceback
 
 from System.Collections.Generic import List
@@ -443,12 +447,11 @@ def make_circuit(outlets, panel, panel_name):
         for system in circuits_of(o):
             if system.BaseEquipment is None:
                 loose[eid_int(system.Id)] = system
+    joined = []
     for system in loose.values():
         try:
             falcon_conduit.all_or_nothing(doc, lambda: system.SelectPanel(panel))
-            doc.Regenerate()
-            notes.append(u"An existing circuit with no panel (<unnamed>) is now "
-                         u"connected to {} as {}.".format(panel_name, system.CircuitNumber))
+            joined.append(system)
         except Exception as ex:
             notes.append(panel_refused(panel_name, ex))
 
@@ -463,7 +466,6 @@ def make_circuit(outlets, panel, panel_name):
             return system
         try:
             created = falcon_conduit.all_or_nothing(doc, create)
-            doc.Regenerate()
         except Exception as ex:
             notes.append(panel_refused(panel_name, ex) + u" No circuit was created.")
     elif not loose:
@@ -473,6 +475,13 @@ def make_circuit(outlets, panel, panel_name):
     if free and on_other > 0:
         notes.append(u"{} outlet(s) were already on a panel circuit and kept it.".format(
             on_other))
+    if joined or created is not None:
+        # ONE model refresh for the whole run: circuit numbers, loads and
+        # phases are then ready for the colors, the home run and the tag
+        doc.Regenerate()
+    for system in joined:
+        notes.insert(0, u"An existing circuit with no panel (<unnamed>) is now "
+                        u"connected to {} as {}.".format(panel_name, system.CircuitNumber))
     return created, notes
 
 
@@ -506,7 +515,9 @@ def main():
     if not falcon_view.is_plan(view):
         forms.alert("Open the plan view of the outlets first.", title=TITLE)
         return
+    clock = Clock()
     styles, boards, tags, wires = line_styles(), panels(), tag_types(), wire_types()
+    clock.lap(u"Read project")
     dialog = WiringDialog(falcon_settings.load(SECTION, DEFAULTS), styles, boards, tags, wires)
     dialog.show_dialog()
     o = dialog.result
@@ -543,6 +554,7 @@ def main():
         return
     # switches control lights only - a socket / power run never asks for one
     switch = pick_switch() if o["add_switch"] and is_lighting_run(outlets) else None
+    clock.restart()             # time spent clicking is not the tool's
 
     rects = [plan_rect(x, view) for x in outlets]
     centers = [(x.Location.Point.X, x.Location.Point.Y) for x in outlets]
@@ -558,6 +570,7 @@ def main():
     else:
         paths = ceiling_paths(outlets, order, rects, local)
     z = falcon_view.plan_z(view)
+    clock.lap(u"Routes")
 
     lines_made = 0
     report = []
@@ -578,10 +591,9 @@ def main():
                     report.extend(notes)
                 except Exception as ex:
                     report.append(u"Circuit not created: {}".format(ex))
+                clock.lap(u"Circuit")
 
             phases = {}             # circuit label -> (letter, how found)
-            if o["color_mode"] == "phase":
-                doc.Regenerate()    # loads and numbers of the new circuit
             for a, path in paths:
                 pts = falcon_wiring.lift(path, z)
                 color = None
@@ -603,14 +615,18 @@ def main():
                         paint(view, line, color)
                     lines_made += 1
 
+            clock.lap(u"Wires")
             if switch is not None:
                 made, notes = wire_switch(view, o, switch, outlets, order, paths,
                                           rects, centers, z)
                 lines_made += made
                 report.extend(notes)
+                clock.lap(u"Switch")
 
             if o["add_tag"]:
                 report.extend(add_tag(view, outlets[order[0]], o, z))
+                clock.lap(u"Tag")
+    clock.lap(u"Save")
 
     what = {"lines": u"detail line(s)",
             "arc": u"arc Revit wire(s) ({})".format(o["wire_type"]),
@@ -628,7 +644,27 @@ def main():
     elif o["draw"] == "lines":
         head.append(u"Line style: {}".format(o["style_name"]))
     head.append(u"Run order: {}.".format(o["run_order"]))
+    report.append(clock.summary())
     forms.alert(u"\n".join(head + report), title=TITLE)
+
+
+class Clock(object):
+    """Seconds spent in each step, shown at the end of the result pop-up."""
+
+    def __init__(self):
+        self.laps = []
+        self.t = time.time()
+
+    def restart(self):
+        self.t = time.time()
+
+    def lap(self, name):
+        now = time.time()
+        self.laps.append((name, now - self.t))
+        self.t = now
+
+    def summary(self):
+        return falcon_wiring.timing_line(self.laps)
 
 
 def is_lighting_run(outlets):
@@ -659,14 +695,22 @@ def switch_id_param(element):
 
 
 def used_switch_ids():
-    used = []
-    for bic in SWITCH_CATEGORIES + CEILING_CATEGORIES:
-        for el in (DB.FilteredElementCollector(doc).OfCategory(bic)
-                   .WhereElementIsNotElementType()):
-            param = switch_id_param(el)
-            if param is not None and param.HasValue and param.AsString():
-                used.append(param.AsString())
-    return used
+    """Switch IDs already used on switches and lights - one pass over the
+    project, by the built-in parameter (no name lookup per element)."""
+    cats = List[DB.BuiltInCategory](list(SWITCH_CATEGORIES + CEILING_CATEGORIES))
+    bip = getattr(DB.BuiltInParameter, "RBS_ELEC_SWITCH_ID_PARAM", None)
+    used = set()
+    for el in (DB.FilteredElementCollector(doc)
+               .WherePasses(DB.ElementMulticategoryFilter(cats))
+               .WhereElementIsNotElementType()):
+        param = el.get_Parameter(bip) if bip is not None else None
+        if param is None:
+            param = el.LookupParameter("Switch ID")
+        if param is not None and param.HasValue:
+            value = param.AsString()
+            if value:
+                used.add(value)
+    return list(used)
 
 
 def wire_switch(view, o, switch, outlets, order, paths, rects, centers, z):
@@ -912,8 +956,9 @@ def is_wire_tag(symbol):
 
 def place_clear(view, tag, before, tip, z):
     """Move the tag so its whole box sits past the arrow tip, with a small
-    gap - never over the arrow or the wire."""
-    doc.Regenerate()
+    gap - never over the arrow or the wire. No model refresh: when Revit
+    cannot measure the new tag yet, it stays at the spot estimated from its
+    text, which is already clear of the arrow."""
     scale = max(view.Scale, 1)
     try:
         text = tag.TagText
@@ -947,7 +992,6 @@ def home_run_wire(view, wire_type, pts, conn, z, kind=None):
     """Arc wire from the first outlet toward the panel, connected at the
     outlet end so Revit treats it as a home run (arrow at the free end).
     Returns (wire or None, reason it failed)."""
-    doc.Regenerate()        # let Revit see the circuit made a moment ago
     points = List[DB.XYZ]([DB.XYZ(p[0], p[1], z) for p in pts])
     first_error = None
     if conn is not None:
