@@ -15,7 +15,7 @@ The **Falcon** tab uses compact small buttons, stacked three high. Panels run
 | Panel | Column 1 | Column 2 | Column 3 | Column 4 |
 |---|---|---|---|---|
 | **Parameters** | Add Param (large) | | | |
-| **Electrical** | Connect Conduit, Convert Line, Multi Fillet | Junction Box, Pull Box, Conduit Cutter | Auto Dimension, Home Run, Line Cutter | Auto Flex (large) |
+| **Electrical** | Connect Conduit, Convert Line, Multi Fillet | Junction Box, Pull Box, Conduit Cutter | Auto Dimension, Home Run, Line Cutter | Auto Flex, Home Run Guide |
 | **Graphics** | Coloring, **Markup ▾** (Redline Markup, Blue Markup, Clear) | | | |
 
 ## Markup (Graphics panel → Markup ▾)
@@ -102,6 +102,24 @@ group.
 
 ## Electrical panel
 
+### Home Run Guide (plan views)
+Draw the main route (the trunk) from the panel with detail lines, and a
+detail line from each circuit/room that ends on the trunk (same line style).
+Then a three-step wizard:
+
+1. **Select** — click **Continue to selection**, pick the trunk lines, Finish.
+2. **Offset** — the route spacing (default 50 mm, remembered).
+3. **Start** — click **Pick start point**, then the temporary square marker at
+   the panel end.
+
+Every branch gets its own lane along the trunk back to the panel, offset by
+the spacing. Lanes go on the side the branch comes from, and the branch
+farthest from the panel gets the inside lane, so nothing crosses. A preview
+reports the routes, segments, lanes per side and crossing score and asks
+**Keep these lines?** — **No** puts everything back; **Yes** removes the
+trunk and replaces lanes made earlier for the same branches. Then use
+**Convert Line** (Line Style) to turn the lanes into conduits.
+
 ### Auto Flex
 Pick the **Flex Diameter (mm)** (20–300, remembered), press **Select Ceiling
 Box**, select the ceiling junction boxes (boxes already selected stay in the
@@ -159,22 +177,43 @@ connected to both sides. A click within 300 mm of a conduit end puts the box
 on the end and connects it. Esc to finish.
 
 ### Convert Line
-Choose **Revit lines** (model/detail lines — pre-select or pick) or **CAD
-lines** (pick lines inside a linked/imported DWG). Then pick the conduit
-type, diameter and middle elevation above the current plan's level. Every
-straight line becomes a conduit; where lines touch, an elbow (corner) or
-coupling (straight on) is added. Arcs are skipped and counted. Your lines are
-left in place.
+Turns detail lines into conduits in one click. The dialog:
+
+1. **Selection** — **Select Line** (pick lines, Finish; pre-selected lines are
+   used straight away), **Line Style** (every line in the active view with the
+   chosen style) or **CAD Lines** (pick lines inside a linked/imported DWG).
+2. **Conduit Type**.
+3. **Conduit Diameter** — the size list of that type's standard.
+4. **Elevation** — a fixed height in mm above the view's level, or **Circuit
+   Elevation**: each connected run takes the height of the fixtures its lines
+   touch (a box's conduit connector, else the top of the fixture) and, where a
+   line ends on a panel, a riser comes up out of the panel top to that height.
+   Runs that touch no fixture use the typed elevation.
+
+**Delete original lines after conversion** removes the converted lines.
+Lines that continue straight on become **one** conduit; where lines meet you
+get an elbow, a tee (a line ending on the middle of another) or a cross.
+Conduit ends that land on a free connector of a box are connected. The result
+says e.g. "Converted 191 line(s) into 130 conduit(s). 2 joint(s) had not
+enough room for a fitting and were left disconnected." Arcs are skipped.
 
 ### Connect Conduit
-Click a conduit near the end you want to connect, then click the target:
-- **another conduit in line** → joined with a coupling;
-- **another conduit at an angle** (same height) → both trimmed/extended to
-  the corner and joined with an elbow;
-- **a device or box** → a conduit route into its free conduit connector
-  (across then down for a top/bottom connector, down then across for a side
-  connector).
-Anything else is refused with a reason and nothing changes.
+Pick the connection in the dialog, then work in the view until **Esc**
+(the whole session is one undo step):
+
+- **Draw New Conduit** (choose diameter and type) — click the exit point on
+  the first element (a free conduit connector within 100 mm is used), then the
+  second element. The conduit runs in straight 90° legs at the exit height,
+  then drops (or rises) onto the second element's free connector, or the
+  middle of its top/bottom.
+- **Connect Conduit** — select the conduits (Finish), then the device or
+  panel. New pieces use each conduit's own type and size. Each conduit runs on
+  along its own line, steps across only if it has to, then goes up/down to the
+  device and connects to its free connector. Into a **panel** every conduit
+  goes straight on to above the middle of the panel and drops onto its top,
+  never sideways, so a bundle keeps its spacing. Pick **one** conduit and
+  another **conduit** as the target to join them as before (coupling in line,
+  elbow at a corner).
 
 ### Multi Fillet
 Select the first group of parallel conduits (Finish), then the second group
@@ -228,7 +267,9 @@ Falcon.extension/
         A_AutoDimension.pushbutton/ (config.py)
         B_HomeRun.pushbutton/       (config.py)
         C_LineCutter.pushbutton/    (config.py)
-      D_AutoFlex.pushbutton/        (large button)
+      D.stack/
+        A_AutoFlex.pushbutton/
+        B_HomeRunGuide.pushbutton/
     Graphics.panel/
       A.stack/
         A_Coloring.pushbutton/
@@ -241,7 +282,8 @@ Falcon.extension/
     bundle.yaml                     (panel order)
   lib/
     falcon_markup.py               (Markup tools)
-    falcon_geom.py, falcon_naming.py, falcon_params.py  (pure - tested offline)
+    falcon_geom.py, falcon_route.py, falcon_naming.py, falcon_params.py
+                                   (pure - tested offline)
     falcon_conduit.py, falcon_color.py        (Revit conduit and colour helpers)
     falcon_settings.py                   (remembered settings)
     falcon_view.py                       (plan-view / annotation helpers)
@@ -255,8 +297,8 @@ can't open files whose full path is longer than 260 characters, and
 
 ## Offline tests
 
-The maths behind Pull Box, Conduit Cutter and Auto Flex, and the Add Param
-rules, run without Revit:
+The maths behind Pull Box, Conduit Cutter, Auto Flex, Home Run Guide,
+Convert Line and Connect Conduit, and the Add Param rules, run without Revit:
 
 ```
 python -m venv .venv

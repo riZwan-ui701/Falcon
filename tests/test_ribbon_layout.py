@@ -41,15 +41,13 @@ def test_parameters_panel():
 
 def test_electrical_stacks_in_order():
     panel = os.path.join(TAB, "Electrical.panel")
-    stacks = [d for d in children(panel) if d.endswith(".stack")]
-    assert [d for d in children(panel) if not d.endswith(".stack")] == [
-        "D_AutoFlex.pushbutton"]
-    with open(os.path.join(panel, "D_AutoFlex.pushbutton", "bundle.yaml"), encoding="utf-8") as f:
-        assert f.readline().strip() == "title: Auto Flex"
+    stacks = children(panel)
+    assert all(s.endswith(".stack") for s in stacks)
     assert [titles(os.path.join(panel, s)) for s in stacks] == [
         ["Connect Conduit", "Convert Line", "Multi Fillet"],
         ["Junction Box", "Pull Box", "Conduit Cutter"],
         ["Auto Dimension", "Home Run", "Line Cutter"],
+        ["Auto Flex", "Home Run Guide"],
     ]
 
 
@@ -82,7 +80,7 @@ def test_every_button_is_complete():
             assert {"script.py", "bundle.yaml", "icon.png"} <= set(files), root
         if root.endswith(".pulldown"):
             assert {"bundle.yaml", "icon.png"} <= set(files), root
-    assert found == 15
+    assert found == 16
 
 
 def test_paths_fit_windows_limit_in_main_folder():

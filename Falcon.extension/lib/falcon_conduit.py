@@ -443,6 +443,48 @@ def connect_union(doc, c1, c2):
         return None
 
 
+def add_fitting(doc, kind, conns):
+    """Elbow / union / tee / cross on the given conduit end connectors
+    (tee: run, run, branch; cross: run pair, then the other pair).
+    Returns the fitting, or None when Revit can't fit it."""
+    try:
+        if kind == "elbow":
+            return doc.Create.NewElbowFitting(conns[0], conns[1])
+        if kind == "union":
+            return doc.Create.NewUnionFitting(conns[0], conns[1])
+        if kind == "tee":
+            return doc.Create.NewTeeFitting(conns[0], conns[1], conns[2])
+        if kind == "cross":
+            return doc.Create.NewCrossFitting(conns[0], conns[1], conns[2], conns[3])
+    except Exception:
+        return None
+    return None
+
+
+def conduit_sizes_mm(doc, ctype):
+    """Nominal sizes (mm) of the conduit type's standard, smallest first;
+    every standard's sizes when the type's standard can't be read."""
+    from Autodesk.Revit.DB.Electrical import ConduitSizeSettings
+    try:
+        settings = ConduitSizeSettings.GetConduitSizeSettings(doc)
+    except Exception:
+        return []
+    standard = None
+    for name in ("RBS_CONDUIT_STANDARD_TYPE_PARAM", "CONDUIT_STANDARD_TYPE_PARAM"):
+        bip = getattr(DB.BuiltInParameter, name, None)
+        param = ctype.get_Parameter(bip) if bip is not None else None
+        if param is not None and param.HasValue:
+            standard = param.AsValueString() or param.AsString()
+            break
+    found, every = [], []
+    for pair in settings:
+        sizes = [round(s.NominalDiameter * 304.8, 1) for s in pair.Value]
+        every.extend(sizes)
+        if standard is not None and pair.Key == standard:
+            found = sizes
+    return sorted(set(found or every))
+
+
 def set_middle_elevation(conduit, offset_ft):
     """Middle elevation of the conduit above its reference level."""
     conduit.get_Parameter(DB.BuiltInParameter.RBS_OFFSET_PARAM).Set(offset_ft)

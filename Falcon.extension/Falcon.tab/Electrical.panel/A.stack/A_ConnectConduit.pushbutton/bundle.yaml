@@ -1,6 +1,8 @@
 title: Connect Conduit
 tooltip: >-
-  Click a conduit near its end, then the conduit or device to connect to.
-  In-line conduits get a coupling, crossing ones an elbow; a device gets a
-  routed conduit into its free connector. Falcon.
+  Draw New Conduit: click the exit point on one element, then a second
+  element - 90-degree legs at that height, then a drop onto it. Connect
+  Conduit: select conduits (Finish), then a device or panel - each conduit
+  runs on along its own line and goes up/down into it; into a panel it drops
+  straight to the middle of the top. Repeats until Esc. Falcon.
 author: Rizwan Zahid
