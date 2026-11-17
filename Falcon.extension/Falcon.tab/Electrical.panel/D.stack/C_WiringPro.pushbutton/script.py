@@ -79,7 +79,9 @@ TITLE = "Falcon - Wiring Pro"
 SECTION = "falcon_wiringpro"
 DEFAULTS = {"outlet": "ceiling", "color_mode": "style", "style_name": "",
             "default_phase": "R", "custom_point": False, "wall_mode": "outlet",
-            "pick_last": True, "make_circuit": True, "panel": "", "add_tag": True,
+            # "circuit_on" (not "make_circuit"): v1 saved False whenever the panel
+            # list was empty, so that old saved value is ignored on purpose
+            "pick_last": True, "circuit_on": True, "panel": "", "add_tag": True,
             "tag_type": "", "wire_type": ""}
 HOME_RUN_MM = 1200.0
 CEILING_CATEGORIES = (DB.BuiltInCategory.OST_LightingFixtures,)
@@ -179,7 +181,9 @@ class WiringDialog(forms.WPFWindow):
         (self.conn_backbox if s["wall_mode"] == "backbox" else self.conn_outlet).IsChecked = True
         self.custom_point.IsChecked = s["custom_point"]
         self.pick_last.IsChecked = s["pick_last"]
-        self.make_circuit.IsChecked = s["make_circuit"] and bool(boards)
+        self.saved_circuit_on = s["circuit_on"]
+        self.warned_no_circuit = False
+        self.make_circuit.IsChecked = s["circuit_on"] and bool(boards)
         self.make_circuit.IsEnabled = bool(boards)
         self.add_tag.IsChecked = s["add_tag"]
         (self.out_wall if s["outlet"] == "wall" else self.out_ceiling).IsChecked = True
@@ -205,6 +209,15 @@ class WiringDialog(forms.WPFWindow):
         if self.add_tag.IsChecked and (tag[1] is None or wire[1] is None):
             self.error.Text = "Load a circuit tag and a wire type, or untick ADD TAG."
             return
+        circuit_on = bool(self.make_circuit.IsChecked) and board[1] is not None
+        if not circuit_on and self.boards and not self.warned_no_circuit:
+            # one reminder; pressing Start again goes ahead without a circuit
+            self.warned_no_circuit = True
+            self.error.Text = (u"\"Create a power circuit\" is off, so no circuit is made "
+                               u"and the tag only shows a circuit for outlets that are "
+                               u"already on one. Tick it, or press Start again to "
+                               u"draw the wiring only.")
+            return
         self.result = {
             "outlet": "wall" if self.out_wall.IsChecked else "ceiling",
             "color_mode": "phase" if self.color_phase.IsChecked else "style",
@@ -213,7 +226,11 @@ class WiringDialog(forms.WPFWindow):
             "custom_point": bool(self.custom_point.IsChecked),
             "wall_mode": "backbox" if self.conn_backbox.IsChecked else "outlet",
             "pick_last": bool(self.pick_last.IsChecked),
-            "make_circuit": bool(self.make_circuit.IsChecked) and board[1] is not None,
+            "make_circuit": circuit_on,
+            # remember the user's tick - but not a box forced off by an empty
+            # panel list
+            "circuit_on": (bool(self.make_circuit.IsChecked) if self.boards
+                           else self.saved_circuit_on),
             "panel": board[0], "panel_el": board[1],
             "add_tag": bool(self.add_tag.IsChecked),
             "tag_type": tag[0], "tag": tag[1], "wire_type": wire[0], "wire": wire[1],

@@ -103,14 +103,16 @@
                                    Text="Needs the first outlet to be on a circuit. If the tag does not show a circuit, tick &quot;Create a power circuit&quot; above."/>
                     </StackPanel>
                 </Border>
-                <TextBlock x:Name="error" Foreground="Firebrick" TextWrapping="Wrap" Margin="2,0,0,8"/>
             </StackPanel>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="14,8,14,12">
-            <Button Content="Cancel" Width="90" Height="28" Margin="0,0,8,0" IsCancel="True" Click="cancel_click"/>
-            <Button Content="Start" Width="100" Height="28" IsDefault="True" Click="ok_click"
-                    Background="#1B2540" Foreground="White" BorderBrush="#1B2540"/>
+        <StackPanel Grid.Row="2" Margin="14,8,14,12">
+            <TextBlock x:Name="error" Foreground="Firebrick" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancel" Width="90" Height="28" Margin="0,0,8,0" IsCancel="True" Click="cancel_click"/>
+                <Button Content="Start" Width="100" Height="28" IsDefault="True" Click="ok_click"
+                        Background="#1B2540" Foreground="White" BorderBrush="#1B2540"/>
+            </StackPanel>
         </StackPanel>
     </Grid>
 </Window>
