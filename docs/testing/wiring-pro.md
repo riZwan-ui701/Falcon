@@ -30,3 +30,7 @@ distribution system, a lighting-fixture circuit tag and a wire type loaded.
 | 20 | Look at the home-run tag | Tag sits clear past the arrow tip, not on the arrow or the wire |
 | 21 | "Start at the outlet nearest the panel" on, circuit on a panel | No click for the first outlet: the run and the home run start at the light nearest the DB |
 | 22 | Same, with circuit off and outlets not on a circuit | Asks you to click the first outlet (no panel to measure from) |
+| 23 | Tick "Add a light switch", Switch ID auto, run on 8 lights, then click a switch | Line (or wire) from the switch to the nearest light, same style/colour, not over a fixture; Switch ID = next free letter on the switch and all 8 lights |
+| 24 | Same, press Esc at the switch click | Run finishes without a switch |
+| 25 | Type Switch ID "S1" | S1 on the switch and lights |
+| 26 | Switch borrowed by another user (workshared) | "Switch … skipped: it is borrowed by …" |

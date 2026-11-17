@@ -266,6 +266,15 @@ def test_circuit_phase_from_number_then_load_then_default():
     assert circuit_phase("2", None, "R") == ("R", "default")
 
 
+def test_next_switch_id():
+    from falcon_wiring import next_switch_id
+    assert next_switch_id([]) == "a"
+    assert next_switch_id(["a", "B", " c ", ""]) == "d"
+    used = [chr(c) for c in range(ord("a"), ord("z") + 1)]
+    assert next_switch_id(used) == "aa"
+    assert next_switch_id(used + ["aa"]) == "ab"
+
+
 def test_lift_and_arc():
     assert lift([(1, 2)], 5) == [(1, 2, 5)]
     pts = arc_points((0, 0), (10, 0), 2.0)

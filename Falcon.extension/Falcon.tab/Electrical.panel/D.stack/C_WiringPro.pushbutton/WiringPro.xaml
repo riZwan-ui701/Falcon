@@ -115,6 +115,21 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
+                        <TextBlock Text="SWITCH" Style="{StaticResource Head}"/>
+                        <CheckBox x:Name="add_switch">
+                            <TextBlock TextWrapping="Wrap" Text="Add a light switch to this run: after the lights, click the switch (Esc skips it). It is wired to the nearest light in the same style and color."/>
+                        </CheckBox>
+                        <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
+                            <TextBlock Text="Switch ID:" Foreground="#6B7385" FontSize="10.5" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox x:Name="switch_id" Width="80" Height="22" Padding="3,1"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Margin="20,4,0,0"
+                                   Text="&quot;auto&quot; gives the next free letter (a, b, c ...). The same Switch ID goes on the switch and every light of the run."/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
                         <TextBlock Text="TAG" Style="{StaticResource Head}"/>
                         <CheckBox x:Name="add_tag" Content="ADD TAG: arc wire to the panel + circuit tag at the first outlet"/>
                         <TextBlock Text="Tag type:" Foreground="#6B7385" FontSize="10.5" Margin="0,6,0,2"/>

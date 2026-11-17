@@ -396,6 +396,26 @@ def circuit_phase(circuit_number, loads, default="R"):
     return default, "default"
 
 
+def switch_id_sequence():
+    """a, b, ... z, aa, ab, ... - the usual lighting Switch ID letters."""
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    for ch in letters:
+        yield ch
+    for a in letters:
+        for b in letters:
+            yield a + b
+
+
+def next_switch_id(used):
+    """First Switch ID in the a, b, c... sequence not already used in the
+    project (case is ignored, so "A" counts as used "a")."""
+    taken = set((u or "").strip().lower() for u in used)
+    for sid in switch_id_sequence():
+        if sid not in taken:
+            return sid
+    return "s1"
+
+
 def lift(path, z):
     return [(p[0], p[1], z) for p in path]
 

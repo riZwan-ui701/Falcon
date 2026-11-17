@@ -7,7 +7,7 @@
 #                  a power circuit on a panel (with its panel schedule), an
 #                  arc home-run wire and a circuit tag at the first outlet.
 # Author         : Rizwan Zahid
-# Version        : 1.0.0
+# Version        : 1.1.0
 # Created Date   : 2026-11-17
 # Updated Date   : 2026-11-17
 # Status         : Production
@@ -48,6 +48,13 @@
 #
 # Changelog
 # ------------------------------------------------------------
+# v1.1.0
+# - Light switch: wired to the nearest light; same Switch ID on the
+#   switch and the run (auto = next free letter)
+# - Draw as detail lines / arc wires / chamfer wires; run order
+#   shortest / clockwise / anticlockwise; start at the light nearest the DB
+# - Home-run wire + Panel/Circuit wire tag clear of the arrow; R/Y/B phase
+#   colors (Y dark goldenrod); safety audit fixes
 # v1.0.0
 # - Initial Release
 #
@@ -87,7 +94,7 @@ DEFAULTS = {"outlet": "ceiling", "color_mode": "style", "style_name": "",
             "default_phase": "R", "custom_point": False, "wall_mode": "outlet",
             # "circuit_on" (not "make_circuit"): v1 saved False whenever the panel
             # list was empty, so that old saved value is ignored on purpose
-            "pick_last": True, "auto_first": True, "circuit_on": True, "panel": "", "add_tag": True,
+            "pick_last": True, "auto_first": True, "add_switch": True, "switch_id": "auto", "circuit_on": True, "panel": "", "add_tag": True,
             "tag_pick": "", "wire_type": "", "draw": "lines", "run_order": "shortest"}
 DRAW_MODES = ("lines", "arc", "chamfer")
 RUN_ORDERS = ("shortest", "clockwise", "anticlockwise")
@@ -105,6 +112,7 @@ WALL_CATEGORIES = (
     DB.BuiltInCategory.OST_TelephoneDevices,
     DB.BuiltInCategory.OST_LightingFixtures,
 )
+SWITCH_CATEGORIES = (DB.BuiltInCategory.OST_LightingDevices,)
 TAG_CATEGORIES = (
     DB.BuiltInCategory.OST_LightingFixtureTags,
     DB.BuiltInCategory.OST_ElectricalFixtureTags,
@@ -193,6 +201,8 @@ class WiringDialog(forms.WPFWindow):
         self.custom_point.IsChecked = s["custom_point"]
         self.pick_last.IsChecked = s["pick_last"]
         self.auto_first.IsChecked = s["auto_first"]
+        self.add_switch.IsChecked = s["add_switch"]
+        self.switch_id.Text = s["switch_id"] or u"auto"
         self.saved_circuit_on = s["circuit_on"]
         self.warned_no_circuit = False
         self.make_circuit.IsChecked = s["circuit_on"] and bool(boards)
@@ -264,6 +274,8 @@ class WiringDialog(forms.WPFWindow):
             "wall_mode": "backbox" if self.conn_backbox.IsChecked else "outlet",
             "pick_last": bool(self.pick_last.IsChecked),
             "auto_first": bool(self.auto_first.IsChecked),
+            "add_switch": bool(self.add_switch.IsChecked),
+            "switch_id": (self.switch_id.Text or u"auto").strip() or u"auto",
             "make_circuit": circuit_on,
             # remember the user's tick - but not a box forced off by an empty
             # panel list
@@ -486,6 +498,7 @@ def main():
             local = host[0].GetTransform().Inverse.OfPoint(pt)
     except OperationCanceledException:
         return
+    switch = pick_switch() if o["add_switch"] else None
 
     rects = [plan_rect(x, view) for x in outlets]
     centers = [(x.Location.Point.X, x.Location.Point.Y) for x in outlets]
@@ -547,6 +560,12 @@ def main():
                         paint(view, line, color)
                     lines_made += 1
 
+            if switch is not None:
+                made, notes = wire_switch(view, o, switch, outlets, order, paths,
+                                          rects, centers, z)
+                lines_made += made
+                report.extend(notes)
+
             if o["add_tag"]:
                 report.extend(add_tag(view, outlets[order[0]], o, z))
 
@@ -567,6 +586,104 @@ def main():
         head.append(u"Line style: {}".format(o["style_name"]))
     head.append(u"Run order: {}.".format(o["run_order"]))
     forms.alert(u"\n".join(head + report), title=TITLE)
+
+
+def pick_switch():
+    """The light switch for this run, or None when Esc is pressed."""
+    try:
+        ref = uidoc.Selection.PickObject(
+            ObjectType.Element, OutletFilter(SWITCH_CATEGORIES),
+            "Click the light switch for these lights (Esc to skip the switch)")
+    except OperationCanceledException:
+        return None
+    return doc.GetElement(ref.ElementId)
+
+
+def switch_id_param(element):
+    bip = getattr(DB.BuiltInParameter, "RBS_ELEC_SWITCH_ID_PARAM", None)
+    param = element.get_Parameter(bip) if bip is not None else None
+    if param is None:
+        param = element.LookupParameter("Switch ID")
+    return param
+
+
+def used_switch_ids():
+    used = []
+    for bic in SWITCH_CATEGORIES + CEILING_CATEGORIES:
+        for el in (DB.FilteredElementCollector(doc).OfCategory(bic)
+                   .WhereElementIsNotElementType()):
+            param = switch_id_param(el)
+            if param is not None and param.HasValue and param.AsString():
+                used.append(param.AsString())
+    return used
+
+
+def wire_switch(view, o, switch, outlets, order, paths, rects, centers, z):
+    """Wire the switch to the nearest light of the run (same draw style and
+    color as the run, never over a fixture or an earlier line) and give the
+    switch and every light of the run the same Switch ID.
+    Returns (lines or wires made, report lines)."""
+    note = falcon_safety.owner_note(doc, switch)
+    if note:
+        return 0, [u"Switch {} skipped: {}.".format(switch.Id, note)]
+    loc = getattr(switch.Location, "Point", None)
+    if loc is None:
+        return 0, [u"Switch {} skipped: it has no insertion point.".format(switch.Id)]
+    near = falcon_wiring.nearest_to(centers, (loc.X, loc.Y))
+    others = [rects[k] for k in range(len(rects)) if k != near]
+    drawn = []
+    for _a, path in paths:
+        pts = list(path)
+        drawn.extend(zip(pts, pts[1:]))
+    sw_rect = plan_rect(switch, view)
+
+    if o["draw"] == "arc":
+        mid = (sum(c[0] for c in centers) / len(centers),
+               sum(c[1] for c in centers) / len(centers))
+        size = min(max(r[2] - r[0], r[3] - r[1]) for r in rects)
+        path, _poly = falcon_wiring.best_arc(connector_xy(switch), connector_xy(outlets[near]),
+                                             mid, others, [], tol=0.25 * size)
+    else:
+        path, _sa, _sb = falcon_wiring.route_sides(sw_rect, rects[near], others, drawn=drawn)
+    pts = falcon_wiring.lift(path, z)
+
+    color = None
+    if o["color_mode"] == "phase":
+        letter = phase_of(outlets[near], o["default_phase"])[0]
+        color = DB.Color(*falcon_wiring.PHASE_RGB[letter])
+    made = 0
+    if o["draw"] == "lines":
+        for p, q in zip(pts, pts[1:]):
+            line = doc.Create.NewDetailCurve(view, DB.Line.CreateBound(DB.XYZ(*p), DB.XYZ(*q)))
+            if o["color_mode"] == "style" and o["style"] is not None:
+                line.LineStyle = o["style"]
+            else:
+                paint(view, line, color)
+            made += 1
+    else:
+        kind = WiringType.Arc if o["draw"] == "arc" else WiringType.Chamfer
+        wire = Wire.Create(doc, o["wire"].Id, view.Id, kind,
+                           List[DB.XYZ]([DB.XYZ(*p) for p in pts]), None, None)
+        paint(view, wire, color)
+        made += 1
+
+    sid = o["switch_id"]
+    if sid.lower() == u"auto":
+        sid = falcon_wiring.next_switch_id(used_switch_ids())
+    tagged, missing = 0, 0
+    for el in [switch] + list(outlets):
+        param = switch_id_param(el)
+        if param is not None and not param.IsReadOnly and \
+                falcon_safety.owner_note(doc, el) is None:
+            param.Set(sid)
+            tagged += 1
+        else:
+            missing += 1
+    notes = [u"Switch {} wired to the nearest light; Switch ID '{}' set on the switch "
+             u"and {} light(s).".format(switch.Id, sid, max(tagged - 1, 0))]
+    if missing:
+        notes.append(u"   {} element(s) have no editable Switch ID - not set.".format(missing))
+    return made, notes
 
 
 def phase_of(outlet, default):
