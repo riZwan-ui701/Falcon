@@ -545,3 +545,16 @@ def arc_points(start, toward, length, bulge=0.25):
     mid = (start[0] + ux * length / 2.0 - uy * length * bulge,
            start[1] + uy * length / 2.0 + ux * length * bulge)
     return [start, mid, end]
+
+
+def timing_line(laps):
+    """'Time: Circuit 2.1 s, Wires 0.8 s ... (total 3.2 s)' - the slowest
+    step is marked so you can see where a run spends its time."""
+    if not laps:
+        return u"Time: -"
+    total = sum(t for _n, t in laps)
+    slow = max(laps, key=lambda x: x[1])[0] if total > 0 else None
+    parts = []
+    for name, t in laps:
+        parts.append(u"{} {:.1f} s{}".format(name, t, u" (slowest)" if name == slow and len(laps) > 1 else u""))
+    return u"Time: {} - total {:.1f} s".format(u", ".join(parts), total)

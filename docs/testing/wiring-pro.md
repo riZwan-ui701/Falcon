@@ -37,3 +37,5 @@ distribution system, a lighting-fixture circuit tag and a wire type loaded.
 | 27 | Wall mode on sockets only, "Add a light switch" ticked | No switch click is asked; run finishes without a switch |
 | 28 | Lights already on a circuit with no panel (shown as \<unnamed\>), panel chosen | The circuit is connected to the panel; tag reads Panel/Circuit, never \<unnamed\> |
 | 29 | Panel Revit refuses (wrong voltage/poles or no free slot) | Pop-up explains why; no \<unnamed\> circuit is left behind |
+| 30 | Run on 20 lights in a large model, note the "Time:" line in the pop-up | Noticeably faster than v1.1.1; the slowest step is marked |
+| 31 | Arc mode with Wire Tag | Tag still sits just past the arrow, not over it |

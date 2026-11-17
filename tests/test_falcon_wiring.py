@@ -280,3 +280,12 @@ def test_lift_and_arc():
     pts = arc_points((0, 0), (10, 0), 2.0)
     assert pts[0] == (0, 0) and pts[-1] == pytest.approx((2, 0))
     assert pts[1][1] != 0
+
+
+def test_timing_line_marks_slowest_step():
+    line = falcon_wiring.timing_line([("Circuit", 2.1), ("Wires", 0.8), ("Tag", 0.3)])
+    assert line == u"Time: Circuit 2.1 s (slowest), Wires 0.8 s, Tag 0.3 s - total 3.2 s"
+
+
+def test_timing_line_empty():
+    assert falcon_wiring.timing_line([]) == u"Time: -"
