@@ -53,6 +53,11 @@
 import os
 import traceback
 
+import clr
+clr.AddReference("PresentationFramework")
+clr.AddReference("PresentationCore")
+clr.AddReference("WindowsBase")
+
 from System.Windows import Visibility
 
 from pyrevit import revit, DB, forms, script

@@ -47,6 +47,11 @@ import os
 import traceback
 
 from System import Action
+import clr
+clr.AddReference("PresentationFramework")
+clr.AddReference("PresentationCore")
+clr.AddReference("WindowsBase")
+
 from System.Windows import FontWeights
 from System.Windows.Controls import CheckBox, TextBlock, TreeViewItem
 from System.Windows.Input import Cursors

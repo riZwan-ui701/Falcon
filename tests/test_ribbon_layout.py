@@ -83,6 +83,24 @@ def test_every_button_is_complete():
     assert found == 17
 
 
+def test_wpf_assemblies_loaded_before_wpf_imports():
+    # IronPython can only import System.Windows.* once the WPF assemblies
+    # are referenced; otherwise "ImportError: Cannot import name Visibility".
+    for root, _dirs, files in os.walk(TAB):
+        for name in files:
+            if not name.endswith(".py"):
+                continue
+            path = os.path.join(root, name)
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            first = text.find("\nfrom System.Windows")
+            if first < 0:
+                continue
+            for asm in ("PresentationFramework", "PresentationCore", "WindowsBase"):
+                ref = text.find('clr.AddReference("{}")'.format(asm))
+                assert 0 <= ref < first, (path, asm)
+
+
 def test_paths_fit_windows_limit_in_main_folder():
     # Revit/IronPython can't open files past 260 characters. The real
     # extension lives ~45 characters higher than this worktree, so check
