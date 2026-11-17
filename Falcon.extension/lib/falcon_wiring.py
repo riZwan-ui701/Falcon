@@ -22,8 +22,9 @@ import math
 
 SIDES = ("E", "W", "N", "S")
 _FACING = {"E": (1, 0), "W": (-1, 0), "N": (0, 1), "S": (0, -1)}
-# true red, yellow and blue (R / Y / B = L1 / L2 / L3)
-PHASE_RGB = {"R": (255, 0, 0), "Y": (255, 255, 0), "B": (0, 0, 255)}
+# red, yellow and blue for R / Y / B (L1 / L2 / L3). Yellow is dark goldenrod:
+# pure yellow (255, 255, 0) is almost invisible on a white background.
+PHASE_RGB = {"R": (255, 0, 0), "Y": (184, 134, 11), "B": (0, 0, 255)}
 PHASE_NAME = {"R": "red", "Y": "yellow", "B": "blue"}
 
 

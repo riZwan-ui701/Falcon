@@ -250,9 +250,9 @@ def test_nearest_to_panel():
     assert nearest_to(USER_ROOM, (100, -400)) == 4      # bottom-left is nearest the DB
 
 
-def test_phase_colors_are_true_red_yellow_blue():
+def test_phase_colors_red_goldenrod_blue():
     from falcon_wiring import PHASE_RGB
-    assert PHASE_RGB == {"R": (255, 0, 0), "Y": (255, 255, 0), "B": (0, 0, 255)}
+    assert PHASE_RGB == {"R": (255, 0, 0), "Y": (184, 134, 11), "B": (0, 0, 255)}
 
 
 def test_circuit_phase_from_number_then_load_then_default():
