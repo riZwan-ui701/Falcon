@@ -186,6 +186,22 @@ def test_tag_spot_clear_past_the_arrow_tip():
     assert spot == pytest.approx((0, -2))
 
 
+def test_tag_spot_slanted_arrow_stays_close():
+    # the screenshot: arrow pointing up-left, wide one-line tag. The tag
+    # must not cover the tip, yet its nearest edge stays within the gap.
+    w, h, gap = 10.0, 1.4, 0.2
+    tip = (0.0, 0.0)
+    cx, cy = tag_spot((3, -3), tip, w, h, gap)
+    inside = abs(tip[0] - cx) <= w / 2 and abs(tip[1] - cy) <= h / 2
+    assert not inside
+    # distance from the tip to the box edge
+    ex = max(abs(tip[0] - cx) - w / 2, 0.0)
+    ey = max(abs(tip[1] - cy) - h / 2, 0.0)
+    assert (ex * ex + ey * ey) ** 0.5 <= gap + 1e-9
+    # and far closer than the old placement (centre about 4.5 away)
+    assert ((cx - tip[0]) ** 2 + (cy - tip[1]) ** 2) ** 0.5 < 1.5
+
+
 USER_ROOM = [(x, -139) for x in (318, 475, 672, 829)] + \
             [(x, -339) for x in (318, 475, 672, 829)]
 

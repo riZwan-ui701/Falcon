@@ -85,7 +85,7 @@ DEFAULTS = {"outlet": "ceiling", "color_mode": "style", "style_name": "",
             "tag_pick": "", "wire_type": "", "draw": "lines", "run_order": "shortest"}
 DRAW_MODES = ("lines", "arc", "chamfer")
 RUN_ORDERS = ("shortest", "clockwise", "anticlockwise")
-TAG_GAP_PAPER_MM = 2.5     # space between the arrow tip and the tag
+TAG_GAP_PAPER_MM = 1.0     # tag sits this close to the arrow tip (on paper)
 HOME_RUN_MM = 1200.0
 CEILING_CATEGORIES = (DB.BuiltInCategory.OST_LightingFixtures,)
 WALL_CATEGORIES = (

@@ -476,7 +476,12 @@ def tag_spot(before, tip, width, height, gap):
     dx, dy = tip[0] - before[0], tip[1] - before[1]
     d = math.hypot(dx, dy) or 1.0
     ux, uy = dx / d, dy / d
-    reach = gap + abs(ux) * width / 2.0 + abs(uy) * height / 2.0
+    # move the box out along the arrow only until its nearest edge clears
+    # the tip by `gap` - close to the arrow, never on it (the old reach,
+    # |ux|*w/2 + |uy|*h/2, threw the tag far off on a slanted arrow)
+    reach_x = (width / 2.0) / abs(ux) if abs(ux) > 1e-9 else float("inf")
+    reach_y = (height / 2.0) / abs(uy) if abs(uy) > 1e-9 else float("inf")
+    reach = min(reach_x, reach_y) + gap
     return (tip[0] + ux * reach, tip[1] + uy * reach)
 
 
