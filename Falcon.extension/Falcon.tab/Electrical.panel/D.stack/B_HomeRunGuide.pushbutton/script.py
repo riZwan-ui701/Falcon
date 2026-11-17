@@ -47,6 +47,11 @@ import json
 import os
 import traceback
 
+import clr
+clr.AddReference("PresentationFramework")
+clr.AddReference("PresentationCore")
+clr.AddReference("WindowsBase")
+
 from System.Windows import Visibility
 from System.Windows.Media import SolidColorBrush, Color
 
