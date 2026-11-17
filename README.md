@@ -58,18 +58,23 @@ recolored together — not just the one member you clicked.
 ## Graphics panel
 
 ### Coloring
-Click it and choose:
+Click it and choose in the **What do you want to color?** window (it comes
+back after each job until you press **Close**):
 
 - **Color Family** — a list of families and their types (search box, and
-  "Only families that are used in the project"). Tick a family or some types,
-  press **Choose color…** and pick a color in Revit's color dialog. The color
+  "Only families that are used in the project"). Tick a family or some types
+  — or just click one row — press **Choose color…** and pick a color in
+  Revit's color dialog. The status line says how many views were colored and
+  how many elements match. The color
   is added as a view filter (named `FALCON_COLOR_…`) to every plan, section and
   elevation — on the view template where a view has one, so the color stays
   when templates are re-applied. 3D views are left alone unless you tick
   **Also apply in 3D views**. **Remove color from selected** and **Remove all
   Coloring colors** delete only the filters this tool made.
-- **Color Element** — pick elements (or pre-select them); they are colored in
-  the current view and in every 3D view. Esc to finish.
+- **Color Element** — select the elements (Tab selects a connected run; any
+  pre-selection is kept), **Finish**, untick the categories you don't want in
+  the **Filter selection** list (Check all / Uncheck all), then pick the
+  color. They are colored in the current view and in every 3D view.
 
 ## Parameters panel
 
@@ -151,13 +156,15 @@ conduit connector.
 ### Pull Box
 Fill in the dialog — distance between pull boxes (default 15 m), bends before
 a pull box (default 2), whether the panel riser bend counts as the first bend,
-and which junction box type to use — press **Start**, then click the conduit
-**at the panel end**. The tool follows the run through its elbows and places a
-box every 15 m, or on the straight conduit 300 mm after every second 90° bend,
+and which junction box type to use — press **Start**, select the conduits
+(a whole bundle of home runs at once; pre-selected conduits are used
+straight away), **Finish**, then click the **start point at the panel side** —
+distances are measured from there. Each run is followed through its elbows
+from its end nearest that point, and gets a box every 15 m, or on the straight conduit 300 mm after every second 90° bend,
 whichever comes first. An existing junction box on the run restarts the count;
 a tee stops the walk. If the box family has two conduit connectors
 (a "through / 2-way" box) the conduit is cut and connected to it. The dialog
-remembers your last values.
+remembers your last values. The report gives the boxes placed per run.
 
 ### Conduit Cutter
 Select the straight conduits that cross (or pick them and click **Finish**),
