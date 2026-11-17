@@ -41,6 +41,11 @@
 #   - Line style or R / Y / B phase colors from each outlet's circuit
 #   - One undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -73,6 +78,7 @@ import falcon_wiring
 import falcon_conduit
 import falcon_view
 import falcon_settings
+import falcon_safety
 from falcon_color import eid_int
 
 TITLE = "Falcon - Wiring Pro"
@@ -439,8 +445,7 @@ def electrical_connector(el):
 # ----------------------------------------------------------------- main
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     view = doc.ActiveView
     if not falcon_view.is_plan(view):

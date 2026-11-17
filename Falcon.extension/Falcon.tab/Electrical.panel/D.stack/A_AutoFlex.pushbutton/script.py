@@ -36,6 +36,11 @@
 #     families of the same category and conduit size
 #   - Each box all-or-nothing; the whole run is one undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -58,6 +63,7 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 import falcon_geom
 import falcon_conduit
 import falcon_settings
+import falcon_safety
 from falcon_color import eid_int
 
 TITLE = "Falcon - Auto Flex"
@@ -294,8 +300,7 @@ def do_box(inst, targets, opts, cache):
 # ----------------------------------------------------------------- main
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     flex_type, system = flex_type_and_system()
     if flex_type is None or system is None:
@@ -319,7 +324,7 @@ def main():
         return
 
     created = switched = 0
-    skipped = []
+    boxes, skipped = falcon_safety.split_editable(doc, boxes)
     cache = {}
     flex_ends = existing_flex_ends()
     with revit.TransactionGroup("Falcon: Auto Flex"):

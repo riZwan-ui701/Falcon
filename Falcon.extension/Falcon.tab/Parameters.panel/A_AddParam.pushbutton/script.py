@@ -34,6 +34,11 @@
 #     used for this run and Revit's setting is put back afterwards.
 #   - Reload keeps the project's existing parameter values.
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -61,6 +66,7 @@ from pyrevit import revit, DB, forms, script
 
 import falcon_params
 import falcon_settings
+import falcon_safety
 from falcon_color import eid_int
 
 TITLE = "Falcon - Add Param"
@@ -228,15 +234,17 @@ def set_values(name, parsed, jobs, by_key):
     """Put the optional value on the ticked types (type parameter) or on
     the placed instances of those types (instance parameter)."""
     done = failed = 0
+    by_type = {}            # placed instances per type id - collected once
+    if any(job["instance"] and job["types"] for job in jobs.values()):
+        for fi in DB.FilteredElementCollector(doc).OfClass(DB.FamilyInstance):
+            by_type.setdefault(eid_int(fi.GetTypeId()), []).append(fi)
     with revit.Transaction("Falcon: Add Param value"):
         for fam_key, job in jobs.items():
             type_ids = set(job["types"])
             if not type_ids:
                 continue
             if job["instance"]:
-                targets = [fi for fi in DB.FilteredElementCollector(doc)
-                           .OfClass(DB.FamilyInstance)
-                           if eid_int(fi.GetTypeId()) in type_ids]
+                targets = [fi for tid in type_ids for fi in by_type.get(tid, [])]
             else:
                 targets = [doc.GetElement(sid)
                            for sid in by_key[fam_key].family.GetFamilySymbolIds()
@@ -369,6 +377,12 @@ class AddParamWindow(forms.WPFWindow):
 
         jobs = falcon_params.plan_jobs(sorted(self.ticked_families),
                                        sorted(self.ticked_types), self.family_of_type)
+        if not forms.alert(
+                u"This will add '{}' to {} family(ies): each family is edited and "
+                u"reloaded into the project. Ctrl+Z undoes it. Continue?".format(
+                    name, len(jobs)),
+                title=TITLE, yes=True, no=True):
+            return
         self.add_button.IsEnabled = False
         self.Cursor = Cursors.Wait
         try:
@@ -412,8 +426,7 @@ class AddParamWindow(forms.WPFWindow):
 
 
 def main():
-    if doc is None or doc.IsFamilyDocument:
-        forms.alert("Open a Revit project (not a family) first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     families = editable_families()
     if not families:

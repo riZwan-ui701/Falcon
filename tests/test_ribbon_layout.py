@@ -114,6 +114,48 @@ def test_panels_are_not_found_through_the_box_check():
                 assert "or falcon_conduit.is_box_like" not in text, name
 
 
+AUDITED_TOOLS = [
+    "Electrical.panel/D.stack/A_AutoFlex.pushbutton",
+    "Electrical.panel/D.stack/B_HomeRunGuide.pushbutton",
+    "Electrical.panel/D.stack/C_WiringPro.pushbutton",
+    "Parameters.panel/A_AddParam.pushbutton",
+    "Electrical.panel/A.stack/A_ConnectConduit.pushbutton",
+    "Electrical.panel/A.stack/B_ConvertLine.pushbutton",
+    "Electrical.panel/B.stack/A_JunctionBox.pushbutton",
+    "Electrical.panel/B.stack/B_PullBox.pushbutton",
+    "Electrical.panel/C.stack/A_AutoDimension.pushbutton",
+    "Graphics.panel/A.stack/A_Coloring.pushbutton",
+]
+
+
+def _script(tool):
+    with open(os.path.join(TAB, tool, "script.py"), encoding="utf-8") as f:
+        return f.read()
+
+
+def test_audited_tools_have_full_metadata():
+    # revit-tool-pyrevit skill: metadata block incl. Notes on every script
+    for tool in AUDITED_TOOLS:
+        text = _script(tool)
+        for field in ("# Tool Name", "# Purpose", "# Version", "# Target Revit",
+                      "# Python Version", "# Input", "# Output", "# Features",
+                      "# Notes", "# Changelog"):
+            assert field in text, (tool, field)
+
+
+def test_audited_tools_exit_cleanly_in_family_editor():
+    # revit-tool-pyrevit skill: project-only tools check the document type
+    for tool in AUDITED_TOOLS:
+        assert "falcon_safety.project_only(doc, TITLE)" in _script(tool), tool
+
+
+def test_audited_tools_are_ironpython_safe():
+    # revit-tool-pyrevit skill: no f-strings on an IronPython 2.7 target
+    import re
+    for tool in AUDITED_TOOLS:
+        assert not re.search(r"""\bf["']""", _script(tool)), tool
+
+
 def test_paths_fit_windows_limit_in_main_folder():
     # Revit/IronPython can't open files past 260 characters. The real
     # extension lives ~45 characters higher than this worktree, so check

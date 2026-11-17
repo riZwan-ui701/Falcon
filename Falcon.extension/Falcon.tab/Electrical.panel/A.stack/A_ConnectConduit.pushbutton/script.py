@@ -38,6 +38,11 @@
 #   - One conduit + another conduit as target: coupling or elbow (as v1)
 #   - Each conduit all-or-nothing; the whole session is one undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v2.0.0
@@ -68,6 +73,7 @@ import falcon_geom
 import falcon_route
 import falcon_conduit
 import falcon_settings
+import falcon_safety
 
 TITLE = "Falcon - Connect Conduit"
 SECTION = "falcon_connectconduit"
@@ -337,9 +343,10 @@ def run_connect():
             "Click the device or panel to connect them to (Esc to exit)")
     except OperationCanceledException:
         return False
-    conduits = [doc.GetElement(r.ElementId) for r in refs]
+    conduits, owned = falcon_safety.split_editable(
+        doc, [doc.GetElement(r.ElementId) for r in refs])
     target = doc.GetElement(ref_t.ElementId)
-    done, refused = 0, []
+    done, refused = 0, list(owned)
     with revit.Transaction("Falcon: Connect Conduit"):
         for conduit in conduits:
             if conduit.Id == target.Id:
@@ -417,8 +424,7 @@ def run_draw(opts):
 # ----------------------------------------------------------------- main
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     types = falcon_conduit.conduit_types(doc)
     dialog = ConnectDialog(falcon_settings.load(SECTION, DEFAULTS), types)
