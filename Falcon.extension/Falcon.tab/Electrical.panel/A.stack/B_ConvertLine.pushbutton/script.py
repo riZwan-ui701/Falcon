@@ -67,7 +67,6 @@ import falcon_geom
 import falcon_route
 import falcon_conduit
 import falcon_settings
-from falcon_color import eid_int
 
 TITLE = "Falcon - Convert Line"
 SECTION = "falcon_convertline"
@@ -290,9 +289,7 @@ class Device(object):
         self.element = element
         box = element.get_BoundingBox(None)
         self.min, self.max = box.Min, box.Max
-        self.is_panel = (
-            eid_int(element.Category.Id) == int(DB.BuiltInCategory.OST_ElectricalEquipment)
-            and not falcon_conduit.is_box_like(element))
+        self.is_panel = falcon_conduit.is_panel(element)
 
     def touches(self, p, tol):
         return (self.min.X - tol <= p[0] <= self.max.X + tol

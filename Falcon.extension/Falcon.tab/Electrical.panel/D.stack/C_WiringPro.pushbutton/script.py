@@ -127,7 +127,7 @@ def panels():
     for el in (DB.FilteredElementCollector(doc)
                .OfCategory(DB.BuiltInCategory.OST_ElectricalEquipment)
                .WhereElementIsNotElementType()):
-        if not isinstance(el, DB.FamilyInstance) or falcon_conduit.is_box_like(el):
+        if not falcon_conduit.is_panel(el):
             continue
         p = el.get_Parameter(DB.BuiltInParameter.RBS_ELEC_PANEL_NAME)
         label = (p.AsString() if p is not None and p.AsString() else name_of(el))

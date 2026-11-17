@@ -68,7 +68,6 @@ import falcon_geom
 import falcon_route
 import falcon_conduit
 import falcon_settings
-from falcon_color import eid_int
 
 TITLE = "Falcon - Connect Conduit"
 SECTION = "falcon_connectconduit"
@@ -170,10 +169,7 @@ def end_index(conduit, point):
 
 
 def is_panel(element):
-    cat = element.Category
-    return (cat is not None
-            and eid_int(cat.Id) == int(DB.BuiltInCategory.OST_ElectricalEquipment)
-            and not falcon_conduit.is_box_like(element))
+    return falcon_conduit.is_panel(element)
 
 
 def box_of(element):

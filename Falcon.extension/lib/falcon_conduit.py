@@ -239,6 +239,18 @@ def is_box_like(element):
     return any(word in family for word in BOX_WORDS)
 
 
+def is_panel(element):
+    """A panel / distribution board: Electrical Equipment whose family name
+    does not say box or junction. (is_box_like counts every piece of
+    Electrical Equipment as a box, so it must not be used to find panels.)"""
+    if not isinstance(element, DB.FamilyInstance):
+        return False
+    if not _category_is(element, (DB.BuiltInCategory.OST_ElectricalEquipment,)):
+        return False
+    family = element.Symbol.Family.Name.lower()
+    return not any(word in family for word in BOX_WORDS)
+
+
 def classify_fitting(fi):
     """"bend" | "fitting" | "box" | "branch" for a family instance on a run.
 

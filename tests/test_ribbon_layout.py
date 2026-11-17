@@ -101,6 +101,19 @@ def test_wpf_assemblies_loaded_before_wpf_imports():
                 assert 0 <= ref < first, (path, asm)
 
 
+def test_panels_are_not_found_through_the_box_check():
+    # is_box_like() is True for every Electrical Equipment element, panels
+    # included - so "not is_box_like" silently drops every panel. Panel
+    # lookups must use falcon_conduit.is_panel().
+    for root, _dirs, files in os.walk(TAB):
+        for name in files:
+            if name.endswith(".py"):
+                with open(os.path.join(root, name), encoding="utf-8") as f:
+                    text = f.read()
+                assert "not falcon_conduit.is_box_like" not in text, name
+                assert "or falcon_conduit.is_box_like" not in text, name
+
+
 def test_paths_fit_windows_limit_in_main_folder():
     # Revit/IronPython can't open files past 260 characters. The real
     # extension lives ~45 characters higher than this worktree, so check
