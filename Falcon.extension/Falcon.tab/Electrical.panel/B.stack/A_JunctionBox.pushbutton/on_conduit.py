@@ -30,6 +30,11 @@
 #   - Click within 300 mm of a conduit end -> box goes on the end
 #   - Each box all-or-nothing; whole run is one undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -48,6 +53,7 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 import falcon_geom
 import falcon_conduit
 import falcon_settings
+import falcon_safety
 
 TITLE = "Falcon - Junction Box"
 SECTION = "falcon_junctionbox"
@@ -98,8 +104,7 @@ def place_one(symbol, conduit, pick_point):
 
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     symbol = choose_symbol()
     if symbol is None:

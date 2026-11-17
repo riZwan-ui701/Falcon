@@ -33,6 +33,11 @@
 #   - Sets "Bend Radius" when the elbow family allows it
 #   - Each pair all-or-nothing; one undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -50,6 +55,7 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 
 import falcon_geom
 import falcon_conduit
+import falcon_safety
 
 TITLE = "Falcon - Multi Fillet"
 RADIUS_PARAM = "Bend Radius"
@@ -106,8 +112,7 @@ def set_radius(elbow, radius):
 
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     try:
         group_a = pick_group("Select the FIRST group of parallel conduits, then Finish")

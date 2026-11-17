@@ -68,7 +68,7 @@ import falcon_geom
 import falcon_route
 import falcon_settings
 import falcon_safety
-from falcon_color import eid_int
+from falcon_color import eid_int, eid_from
 
 TITLE = "Falcon - Home Run Guide"
 SECTION = "falcon_homerunguide"
@@ -371,7 +371,7 @@ def run_in_group(view, trunk, trunk_lines, trunk_ids, style, style_id,
     with revit.Transaction("Falcon: Home Run Guide"):
         for branch_id in new_mapping:
             for old in previous.get(branch_id, []):
-                el = doc.GetElement(DB.ElementId(old))
+                el = doc.GetElement(eid_from(old))
                 if el is not None and is_detail_line(el):
                     doc.Delete(el.Id)
             previous[branch_id] = new_mapping[branch_id]

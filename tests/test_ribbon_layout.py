@@ -156,6 +156,60 @@ def test_audited_tools_are_ironpython_safe():
         assert not re.search(r"""\bf["']""", _script(tool)), tool
 
 
+# ---- second audit: every Python file in the ribbon, not only the 10 tools
+
+MODEL_TOOLS = AUDITED_TOOLS + [
+    "Electrical.panel/A.stack/C_MultiFillet.pushbutton/script.py",
+    "Electrical.panel/B.stack/A_JunctionBox.pushbutton/on_conduit.py",
+    "Electrical.panel/B.stack/C_ConduitCutter.pushbutton/script.py",
+    "Electrical.panel/C.stack/A_AutoDimension.pushbutton/conduits.py",
+    "Electrical.panel/C.stack/B_HomeRun.pushbutton/script.py",
+    "Electrical.panel/C.stack/C_LineCutter.pushbutton/script.py",
+]
+FIELDS = ("# Tool Name", "# Purpose", "# Author", "# Version", "# Target Revit",
+          "# Platform", "# Python Version", "# Notes", "# Changelog")
+
+
+def _read(rel):
+    path = os.path.join(TAB, rel)
+    if os.path.isdir(path):
+        path = os.path.join(path, "script.py")
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def _ribbon_py_files():
+    for root, _dirs, files in os.walk(TAB):
+        for name in files:
+            if name.endswith(".py"):
+                yield os.path.relpath(os.path.join(root, name), TAB)
+
+
+def test_every_ribbon_python_file_has_the_metadata_block():
+    # revit-tool-pyrevit skill: "every .py file starts with this metadata header"
+    for rel in _ribbon_py_files():
+        text = _read(rel)
+        for field in FIELDS:
+            assert field in text, (rel, field)
+
+
+def test_every_model_tool_exits_cleanly_in_family_editor():
+    for rel in MODEL_TOOLS:
+        assert "falcon_safety.project_only(doc, TITLE)" in _read(rel), rel
+
+
+def test_element_ids_are_rebuilt_version_safely():
+    # revit-version-matrix skill: build ElementIds from stored numbers through
+    # one feature-detecting helper, never ElementId(number) in a tool
+    import re
+    for rel in _ribbon_py_files():
+        for line in _read(rel).splitlines():
+            m = re.search(r"DB\.ElementId\(([^)]*)\)", line)
+            if m:
+                assert "BuiltInParameter" in m.group(1) or "BuiltInCategory" in m.group(1), \
+                    (rel, line.strip())
+
+
 def test_paths_fit_windows_limit_in_main_folder():
     # Revit/IronPython can't open files past 260 characters. The real
     # extension lives ~45 characters higher than this worktree, so check

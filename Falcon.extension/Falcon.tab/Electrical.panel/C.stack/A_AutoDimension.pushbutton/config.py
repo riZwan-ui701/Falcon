@@ -1,5 +1,45 @@
-# Auto Dimension - Shift+click: the conduit-to-grid tool and the settings
-# (Falcon, Rizwan Zahid, v2.0.0, Revit 2020-2027, IronPython 2.7)
+# ============================================================
+# Tool Metadata
+# ============================================================
+# Tool Name      : Auto Dimension - Shift+click (more options)
+# Purpose        : Dimension conduits to grids, or set the outlet / conduit dimension distances.
+# Author         : Rizwan Zahid
+# Version        : 2.0.0
+# Created Date   : 2026-11-17
+# Updated Date   : 2026-11-17
+# Status         : Production
+#
+# Target Revit   : Revit 2020 - 2027
+# Platform       : pyRevit
+# Python Version : IronPython 2.7
+#
+# Category       : BIM Automation
+# Discipline     : Electrical
+# Tool Type      : pyRevit Tool (Shift+click of the button)
+#
+# Input          : Active View - a choice from a short menu.
+# Output         : Conduit dimensions, or a saved distance setting.
+#
+# Dependencies   :
+#   - pyRevit, Revit API
+#   - conduits.py in this button folder, falcon_view.py
+#
+# Features       :
+#   - Conduits-to-grids tool and both distance settings
+#
+# Notes          :
+#   - Runs when the button is Shift+clicked; the normal click runs script.py.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#
+# Changelog
+# ------------------------------------------------------------
+# v2.0.0
+# - Menu: conduits to grids, outlet distance, conduit distance
+#
+# License        : Proprietary
+# Copyright      : (c) Rizwan Zahid. All Rights Reserved
+# ============================================================
+
 import os
 
 from pyrevit import forms
