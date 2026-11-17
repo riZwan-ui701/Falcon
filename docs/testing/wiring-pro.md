@@ -22,3 +22,11 @@ distribution system, a lighting-fixture circuit tag and a wire type loaded.
 | 12 | Wall, Back box | Lines join the back-box circles |
 | 13 | Fixtures already on a circuit, circuit ticked | "every outlet is already on a circuit"; lines still drawn |
 | 14 | Ctrl+Z | Whole run undone (lines, circuit, wire, tag) |
+| 15 | Tag type = a Wire Tag | Home-run arc wire with an arrow from the first outlet toward the panel; tag on it reads Panel/Circuit, e.g. DB-GF-02/R2 |
+| 16 | Tag type = a fixture tag | Tag at the first outlet; report suggests a Wire Tag |
+| 17 | Draw as: Revit wires - Chamfer | Same square routing drawn as wires of the chosen type; report says "chamfer Revit wire(s) (XHHW)" |
+| 18 | Draw as: Revit wires - Arc | Fixture-to-fixture arcs joined to the fixtures, bowed outwards, like Revit's own wiring |
+| 19 | Run order Clockwise, then Anticlockwise, on a 2 x 4 room | Goes round the room from the first fixture in that direction; no line dangles or runs over another line or fixture |
+| 20 | Look at the home-run tag | Tag sits clear past the arrow tip, not on the arrow or the wire |
+| 21 | "Start at the outlet nearest the panel" on, circuit on a panel | No click for the first outlet: the run and the home run start at the light nearest the DB |
+| 22 | Same, with circuit off and outlets not on a circuit | Asks you to click the first outlet (no panel to measure from) |

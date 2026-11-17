@@ -36,6 +36,11 @@
 #   - Joints with no room for a fitting are left disconnected and counted
 #   - Remembers last settings; one undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v2.0.0
@@ -67,7 +72,7 @@ import falcon_geom
 import falcon_route
 import falcon_conduit
 import falcon_settings
-from falcon_color import eid_int
+import falcon_safety
 
 TITLE = "Falcon - Convert Line"
 SECTION = "falcon_convertline"
@@ -290,9 +295,7 @@ class Device(object):
         self.element = element
         box = element.get_BoundingBox(None)
         self.min, self.max = box.Min, box.Max
-        self.is_panel = (
-            eid_int(element.Category.Id) == int(DB.BuiltInCategory.OST_ElectricalEquipment)
-            and not falcon_conduit.is_box_like(element))
+        self.is_panel = falcon_conduit.is_panel(element)
 
     def touches(self, p, tol):
         return (self.min.X - tol <= p[0] <= self.max.X + tol
@@ -369,8 +372,7 @@ def plan_heights(segments, groups, default_z, tol):
 # ----------------------------------------------------------------- main
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     view = doc.ActiveView
     level = getattr(view, "GenLevel", None)
@@ -414,6 +416,11 @@ def main():
         forms.alert("No straight lines to convert.", title=TITLE)
         return
     line_count = len(used) if used else len(flat)
+    if opts["delete_lines"] and used and not forms.alert(
+            u"After converting, {} original line(s) will be deleted. "
+            u"Ctrl+Z undoes it. Continue?".format(len(used)),
+            title=TITLE, yes=True, no=True):
+        return
 
     segments, _src = falcon_route.merge_collinear(
         falcon_route.split_at_touches(flat, tol), tol)
@@ -495,8 +502,10 @@ def main():
             if opts["delete_lines"] and used:
                 made_any = any(c is not None for c in conduits)
                 if made_any:
-                    for el in used:
+                    deletable, owned = falcon_safety.split_editable(doc, used)
+                    for el in deletable:
                         doc.Delete(el.Id)
+                    problems.extend(u"line {} kept".format(x) for x in owned)
 
     made = len([c for c in conduits if c is not None])
     lines = [u"Converted {} line(s) into {} conduit(s).".format(line_count, made + risers)]

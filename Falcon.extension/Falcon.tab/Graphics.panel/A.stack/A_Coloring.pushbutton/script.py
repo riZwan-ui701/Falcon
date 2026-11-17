@@ -37,6 +37,11 @@
 #   - Remove color from selected / remove all Coloring colors
 #   - Never changes the elements themselves - graphics only
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v2.0.0
@@ -71,6 +76,7 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 
 import falcon_color
 import falcon_naming
+import falcon_safety
 
 TITLE = "Falcon - Coloring"
 SYSTEM_CATEGORIES = (
@@ -444,8 +450,7 @@ class ColoringMenu(forms.WPFWindow):
         self.Close()
 
 
-if doc is None:
-    forms.alert("Please open a Revit project first.", title=TITLE)
+if not falcon_safety.project_only(doc, TITLE):
     script.exit()
 
 while True:

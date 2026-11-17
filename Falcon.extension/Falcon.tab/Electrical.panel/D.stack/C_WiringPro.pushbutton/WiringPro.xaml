@@ -52,6 +52,17 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
+                        <TextBlock Text="DRAW AS" Style="{StaticResource Head}"/>
+                        <RadioButton x:Name="draw_lines" GroupName="draw" Content="Detail lines (square, side middle to side middle)"/>
+                        <RadioButton x:Name="draw_arc" GroupName="draw" Content="Revit wires - Arc (like Revit's own wiring)" Margin="0,4,0,0"/>
+                        <RadioButton x:Name="draw_chamfer" GroupName="draw" Content="Revit wires - Chamfer (square route)" Margin="0,4,0,0"/>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                   Text="Revit wires use the Wire type in the Tag section and show in wire schedules; arc wires are joined to the fixtures. The home run follows the same style."/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
                         <TextBlock Text="WIRE COLOR" Style="{StaticResource Head}"/>
                         <RadioButton x:Name="color_style" GroupName="color" Content="Line style"/>
                         <ComboBox x:Name="line_style" Height="24" Margin="20,4,0,8"/>
@@ -75,8 +86,19 @@
                             <RadioButton x:Name="conn_backbox" GroupName="wallconn" Content="Back box"/>
                             <TextBlock Style="{StaticResource Hint}" Text="The line goes from a circle of the back box to a circle of the next outlet's back box. An outlet already entered on one circle leaves from the other one."/>
                         </StackPanel>
-                        <CheckBox x:Name="pick_last" Margin="0,6,0,0">
-                            <TextBlock TextWrapping="Wrap" Text="Also pick the LAST outlet. Off: pick only the first, the end of the run is chosen for you"/>
+                        <CheckBox x:Name="auto_first" Margin="0,8,0,0">
+                            <TextBlock TextWrapping="Wrap" Text="Start at the outlet nearest the panel (no click) - the home run comes from it automatically. Off: you click the first outlet."/>
+                        </CheckBox>
+                        <TextBlock Text="Run order" Foreground="#6B7385" FontSize="10.5" Margin="0,8,0,2"/>
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="order_shortest" GroupName="order" Content="Shortest" Margin="0,0,16,0" Checked="order_changed"/>
+                            <RadioButton x:Name="order_clockwise" GroupName="order" Content="Clockwise" Margin="0,0,16,0" Checked="order_changed"/>
+                            <RadioButton x:Name="order_anticlockwise" GroupName="order" Content="Anticlockwise" Checked="order_changed"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,4"
+                                   Text="Clockwise / Anticlockwise go round the outlets from the first one you click."/>
+                        <CheckBox x:Name="pick_last" Margin="0,2,0,0">
+                            <TextBlock TextWrapping="Wrap" Text="Also pick the LAST outlet (Shortest only). Off: pick only the first, the end of the run is chosen for you"/>
                         </CheckBox>
                     </StackPanel>
                 </Border>
@@ -100,17 +122,19 @@
                         <TextBlock Text="Wire type:" Foreground="#6B7385" FontSize="10.5" Margin="0,6,0,2"/>
                         <ComboBox x:Name="wire_type" Height="24"/>
                         <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
-                                   Text="Needs the first outlet to be on a circuit. If the tag does not show a circuit, tick &quot;Create a power circuit&quot; above."/>
+                                   Text="A Wire Tag goes on the home-run wire and reads Panel/Circuit (for example DB-GF-02/R2), like Revit's own home runs; any other tag type goes on the first outlet. Needs the first outlet to be on a circuit: tick &quot;Create a power circuit&quot; above."/>
                     </StackPanel>
                 </Border>
-                <TextBlock x:Name="error" Foreground="Firebrick" TextWrapping="Wrap" Margin="2,0,0,8"/>
             </StackPanel>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="14,8,14,12">
-            <Button Content="Cancel" Width="90" Height="28" Margin="0,0,8,0" IsCancel="True" Click="cancel_click"/>
-            <Button Content="Start" Width="100" Height="28" IsDefault="True" Click="ok_click"
-                    Background="#1B2540" Foreground="White" BorderBrush="#1B2540"/>
+        <StackPanel Grid.Row="2" Margin="14,8,14,12">
+            <TextBlock x:Name="error" Foreground="Firebrick" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Cancel" Width="90" Height="28" Margin="0,0,8,0" IsCancel="True" Click="cancel_click"/>
+                <Button Content="Start" Width="100" Height="28" IsDefault="True" Click="ok_click"
+                        Background="#1B2540" Foreground="White" BorderBrush="#1B2540"/>
+            </StackPanel>
         </StackPanel>
     </Grid>
 </Window>

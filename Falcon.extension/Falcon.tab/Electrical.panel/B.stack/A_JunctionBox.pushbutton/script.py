@@ -38,6 +38,11 @@
 #   - Skipped fixtures listed with the reason; one undo step
 #   - Shift+click: the original click-on-conduit Junction Box
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v2.0.0
@@ -66,6 +71,7 @@ import falcon_geom
 import falcon_layout
 import falcon_conduit
 import falcon_settings
+import falcon_safety
 from falcon_color import eid_int
 
 TITLE = "Falcon - Junction Box"
@@ -279,8 +285,7 @@ def zoom_to(points):
 # ----------------------------------------------------------------- main
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     view = doc.ActiveView
     level = getattr(view, "GenLevel", None)
@@ -363,7 +368,11 @@ def main():
                     if is_new:
                         inst = doc.Create.NewFamilyInstance(
                             point, symbol, level, StructuralType.NonStructural)
-                    elif inst.GetTypeId() != symbol.Id:
+                    else:
+                        note = falcon_safety.owner_note(doc, inst)
+                        if note:
+                            raise ValueError(u"existing box {}: {}".format(inst.Id, note))
+                    if not is_new and inst.GetTypeId() != symbol.Id:
                         inst.ChangeTypeId(symbol.Id)
                     falcon_conduit.set_height(doc, inst, z)
                     turn_to(inst, dirs)

@@ -35,6 +35,11 @@
 #   - Remembers the last values used
 #   - Every selected run gets its own boxes; one undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v2.0.0
@@ -57,6 +62,7 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 import falcon_geom
 import falcon_conduit
 import falcon_settings
+import falcon_safety
 from falcon_color import eid_int
 
 TITLE = "Falcon - Pull Box"
@@ -150,8 +156,7 @@ def place_all(run, boxes, symbol):
 
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     symbols = falcon_conduit.box_symbols(doc)
     if not symbols:
@@ -165,7 +170,7 @@ def main():
         return
     falcon_settings.save(SECTION, dict((k, opts[k]) for k in DEFAULTS))
 
-    selected = pick_conduits()
+    selected, owned = falcon_safety.split_editable(doc, pick_conduits())
     if not selected:
         return
     try:
@@ -176,7 +181,7 @@ def main():
 
     runs = runs_from(selected, start)
     total_placed = 0
-    report, skipped = [], []
+    report, skipped = [], list(owned)
     with revit.TransactionGroup("Falcon: Pull Box"):
         with revit.Transaction("Falcon: Pull Box"):
             for n, run in enumerate(runs, 1):

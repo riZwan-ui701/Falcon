@@ -34,6 +34,11 @@
 #     no usable centre reference, dimension errors
 #   - Shift+click: the conduit-to-grid tool (conduits.py) and settings
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v2.0.0
@@ -60,6 +65,7 @@ import falcon_layout
 import falcon_conduit
 import falcon_view
 import falcon_settings
+import falcon_safety
 from falcon_color import eid_int
 
 TITLE = "Falcon - Auto Dimension"
@@ -180,8 +186,7 @@ def center_reference(outlet, along):
 # ----------------------------------------------------------------- main
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     view = doc.ActiveView
     if not falcon_view.is_plan(view):

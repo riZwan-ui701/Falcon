@@ -34,6 +34,11 @@
 #   - Re-running on the same branches replaces the lanes made before
 #   - The whole run is one undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -62,6 +67,7 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 import falcon_geom
 import falcon_route
 import falcon_settings
+import falcon_safety
 from falcon_color import eid_int
 
 TITLE = "Falcon - Home Run Guide"
@@ -204,7 +210,9 @@ def chains_size(candidates, branch_ids, tol):
 # ----------------------------------------------------------------- main
 
 def main():
-    view = doc.ActiveView if doc is not None else None
+    if not falcon_safety.project_only(doc, TITLE):
+        return
+    view = doc.ActiveView
     if view is None or view.ViewType not in (
             DB.ViewType.FloorPlan, DB.ViewType.CeilingPlan, DB.ViewType.EngineeringPlan,
             DB.ViewType.DraftingView, DB.ViewType.AreaPlan):
@@ -307,6 +315,13 @@ def run_in_group(view, trunk, trunk_lines, trunk_ids, style, style_id,
         side = falcon_route.branch_side(trunk, seg, touch, other)
         branches.append({"line": line, "end": touch_end, "seg": seg,
                          "along": along, "side": side, "other": other})
+    owned_trunk = [falcon_safety.owner_note(doc, l) for l in trunk_lines]
+    owned_trunk = [n for n in owned_trunk if n]
+    if owned_trunk:
+        return False, (u"The reference line can't be removed: {}.\n"
+                       u"Nothing was changed.".format(owned_trunk[0]))
+    ws_skipped = [b for b in branches if falcon_safety.owner_note(doc, b["line"])]
+    branches = [b for b in branches if b not in ws_skipped]
     if not branches:
         return False, (u"No branch lines touch the reference line.\n"
                        u"Draw the branches with the same line style as the "
@@ -347,6 +362,9 @@ def run_in_group(view, trunk, trunk_lines, trunk_ids, style, style_id,
            u"reference guide removed, when you keep these routes.\n\n"
            u"Keep these lines?").format(len(branches), spacing_mm, unique,
                                         per_side[1], per_side[-1], crossing)
+    if ws_skipped:
+        msg = msg.replace(u"\n\nKeep these lines?", u"\n{} branch line(s) skipped: borrowed by "
+                          u"another user.\n\nKeep these lines?".format(len(ws_skipped)))
     if not forms.alert(msg, title="Falcon - Home Run Guide Preview", yes=True, no=True):
         return False, None
 
