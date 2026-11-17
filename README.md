@@ -124,8 +124,12 @@ Wires a run of outlets and does the paperwork. The dialog (remembered):
 - **Circuit** — create a power circuit on the chosen panel; Revit numbers it
   (e.g. R4) and the panel's schedule lists the fixtures (a panel schedule is
   made if the panel has none).
-- **Tag** — an arc home-run wire toward the panel and a circuit tag at the
-  first outlet, so drawing and schedule stay in sync.
+- **Tag** — an arc home-run wire toward the panel (with Revit's arrow) and a
+  circuit tag. Pick a **Wire Tag** (listed first) and it goes on the home-run
+  wire, reading Panel/Circuit (e.g. `DB-GF-02/R2`) like Revit's own home runs;
+  any other tag type goes on the first outlet.
+- **Draw the run as Revit wires** (optional) — the same square routing, drawn
+  as wires of the chosen wire type instead of detail lines.
 
 Then box-select the outlets (Finish; pre-selected ones are kept) and click the
 **first** outlet (and the **last**, if ticked). The tool finds the shortest run

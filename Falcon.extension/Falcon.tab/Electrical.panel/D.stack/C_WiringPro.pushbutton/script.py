@@ -82,7 +82,7 @@ DEFAULTS = {"outlet": "ceiling", "color_mode": "style", "style_name": "",
             # "circuit_on" (not "make_circuit"): v1 saved False whenever the panel
             # list was empty, so that old saved value is ignored on purpose
             "pick_last": True, "circuit_on": True, "panel": "", "add_tag": True,
-            "tag_type": "", "wire_type": ""}
+            "tag_pick": "", "wire_type": "", "as_wires": False}
 HOME_RUN_MM = 1200.0
 CEILING_CATEGORIES = (DB.BuiltInCategory.OST_LightingFixtures,)
 WALL_CATEGORIES = (
@@ -148,7 +148,9 @@ def tag_types():
                     .WhereElementIsElementType()):
             if isinstance(sym, DB.FamilySymbol):
                 out.append((u"{} : {}".format(sym.Family.Name, name_of(sym)), sym))
-    return sorted(out, key=lambda x: ("circuit" not in x[0].lower(), x[0]))
+    # wire tags first: on the home-run wire they read Panel/Circuit
+    return sorted(out, key=lambda x: (not is_wire_tag(x[1]),
+                                      "circuit" not in x[0].lower(), x[0]))
 
 
 def wire_types():
@@ -175,7 +177,7 @@ class WiringDialog(forms.WPFWindow):
         _fill(self.line_style, [n for n, _x in styles], s["style_name"])
         _fill(self.default_phase, PHASES, s["default_phase"])
         _fill(self.panel, [n for n, _x in boards], s["panel"])
-        _fill(self.tag_type, [n for n, _x in tags], s["tag_type"])
+        _fill(self.tag_type, [n for n, _x in tags], s["tag_pick"])
         _fill(self.wire_type, [n for n, _x in wires], s["wire_type"])
         (self.color_phase if s["color_mode"] == "phase" else self.color_style).IsChecked = True
         (self.conn_backbox if s["wall_mode"] == "backbox" else self.conn_outlet).IsChecked = True
@@ -186,6 +188,7 @@ class WiringDialog(forms.WPFWindow):
         self.make_circuit.IsChecked = s["circuit_on"] and bool(boards)
         self.make_circuit.IsEnabled = bool(boards)
         self.add_tag.IsChecked = s["add_tag"]
+        self.as_wires.IsChecked = s["as_wires"]
         (self.out_wall if s["outlet"] == "wall" else self.out_ceiling).IsChecked = True
         self.outlet_changed(None, None)
 
@@ -203,8 +206,11 @@ class WiringDialog(forms.WPFWindow):
         board = self._pick(self.panel, self.boards)
         tag = self._pick(self.tag_type, self.tags)
         wire = self._pick(self.wire_type, self.wires)
-        if self.color_style.IsChecked and style[1] is None:
+        if self.color_style.IsChecked and style[1] is None and not self.as_wires.IsChecked:
             self.error.Text = "There are no line styles to use."
+            return
+        if self.as_wires.IsChecked and wire[1] is None:
+            self.error.Text = "Pick a Wire type (Tag section) to draw the run as Revit wires."
             return
         if self.add_tag.IsChecked and (tag[1] is None or wire[1] is None):
             self.error.Text = "Load a circuit tag and a wire type, or untick ADD TAG."
@@ -233,7 +239,8 @@ class WiringDialog(forms.WPFWindow):
                            else self.saved_circuit_on),
             "panel": board[0], "panel_el": board[1],
             "add_tag": bool(self.add_tag.IsChecked),
-            "tag_type": tag[0], "tag": tag[1], "wire_type": wire[0], "wire": wire[1],
+            "tag_pick": tag[0], "tag": tag[1], "wire_type": wire[0], "wire": wire[1],
+            "as_wires": bool(self.as_wires.IsChecked),
         }
         self.Close()
 
@@ -469,6 +476,16 @@ def main():
                     letter = falcon_wiring.phase_letter(number, o["default_phase"]) \
                         if number else o["default_phase"]
                     color = DB.Color(*falcon_wiring.PHASE_RGB[letter])
+                if o["as_wires"]:
+                    # one Revit wire per connection, square corners kept
+                    wire = Wire.Create(doc, o["wire"].Id, view.Id, WiringType.Chamfer,
+                                       List[DB.XYZ]([DB.XYZ(*p) for p in pts]), None, None)
+                    if color is not None:
+                        ogs = DB.OverrideGraphicSettings()
+                        ogs.SetProjectionLineColor(color)
+                        view.SetElementOverrides(wire.Id, ogs)
+                    lines_made += 1
+                    continue
                 for p, q in zip(pts, pts[1:]):
                     line = doc.Create.NewDetailCurve(
                         view, DB.Line.CreateBound(DB.XYZ(*p), DB.XYZ(*q)))
@@ -483,10 +500,13 @@ def main():
             if o["add_tag"]:
                 report.extend(add_tag(view, outlets[order[0]], o, z))
 
-    head = [u"{} detail line(s) connecting {} {} outlet(s).".format(
-        lines_made, len(outlets), word)]
-    head.append(u"Phase color (R red, Y yellow, B blue)" if o["color_mode"] == "phase"
-                else u"Line style: {}".format(o["style_name"]))
+    what = u"Revit wire(s) ({})".format(o["wire_type"]) if o["as_wires"] else u"detail line(s)"
+    head = [u"{} {} connecting {} {} outlet(s).".format(
+        lines_made, what, len(outlets), word)]
+    if o["color_mode"] == "phase":
+        head.append(u"Phase color (R red, Y yellow, B blue)")
+    elif not o["as_wires"]:
+        head.append(u"Line style: {}".format(o["style_name"]))
     forms.alert(u"\n".join(head + report), title=TITLE)
 
 
@@ -511,25 +531,64 @@ def add_tag(view, first, o, z):
               else (start[0] - 1.0, start[1] + 1.0))
     pts = falcon_wiring.arc_points(start, toward, falcon_geom.mm_to_ft(HOME_RUN_MM))
     out = []
+    wire, problem = home_run_wire(view, o["wire"], pts, conn, z)
+    if wire is not None:
+        out.append(u"Added a home-run arc wire toward panel {}".format(system.PanelName))
+    else:
+        out.append(u"Home-run wire not added: {}".format(problem))
+
+    # A wire tag goes on the home-run wire and reads Panel/Circuit (for
+    # example DB-GF-02/R2), like Revit's own home runs. Any other tag type
+    # goes on the first outlet.
+    on_wire = wire is not None and is_wire_tag(o["tag"])
+    host = wire if on_wire else first
+    end = pts[-1]
+    spot = DB.XYZ(end[0] + 0.15 * (end[0] - start[0]), end[1] + 0.15 * (end[1] - start[1]), z)
     try:
-        Wire.Create(doc, o["wire"].Id, view.Id, WiringType.Arc,
-                    List[DB.XYZ]([DB.XYZ(p[0], p[1], z) for p in pts]), conn, None)
-        out.append(u"Added an arc wire toward panel {}".format(system.PanelName))
-    except Exception as ex:
-        out.append(u"Arc wire not added: {}".format(ex))
-    try:
-        end = pts[-1]
-        DB.IndependentTag.Create(doc, o["tag"].Id, view.Id, DB.Reference(first), False,
-                                 DB.TagOrientation.Horizontal, DB.XYZ(end[0], end[1], z))
+        DB.IndependentTag.Create(doc, o["tag"].Id, view.Id, DB.Reference(host), False,
+                                 DB.TagOrientation.Horizontal, spot)
+        where = u"on the home-run wire" if on_wire else u"at the first outlet"
+        label = u"{}/{}".format(system.PanelName, system.CircuitNumber)
         if out and out[0].startswith(u"Added"):
-            out[0] += u" and the circuit tag ({}) at the first outlet.".format(
-                system.CircuitNumber)
+            out[0] += u" and the circuit tag ({}) {}.".format(label, where)
         else:
-            out.append(u"Added the circuit tag ({}) at the first outlet.".format(
-                system.CircuitNumber))
+            out.append(u"Added the circuit tag ({}) {}.".format(label, where))
+        if not on_wire and wire is not None:
+            out.append(u"Tip: pick a Wire Tag type to get the Panel/Circuit tag on "
+                       u"the home-run wire.")
     except Exception as ex:
         out.append(u"Tag not added: {}".format(ex))
     return out
+
+
+def is_wire_tag(symbol):
+    cat = symbol.Category
+    return cat is not None and eid_int(cat.Id) == int(DB.BuiltInCategory.OST_WireTags)
+
+
+def home_run_wire(view, wire_type, pts, conn, z):
+    """Arc wire from the first outlet toward the panel, connected at the
+    outlet end so Revit treats it as a home run (arrow at the free end).
+    Returns (wire or None, reason it failed)."""
+    doc.Regenerate()        # let Revit see the circuit made a moment ago
+    points = List[DB.XYZ]([DB.XYZ(p[0], p[1], z) for p in pts])
+    first_error = None
+    if conn is not None:
+        try:
+            return Wire.Create(doc, wire_type.Id, view.Id, WiringType.Arc,
+                               points, conn, None), None
+        except Exception as ex:
+            first_error = ex
+    try:
+        wire = Wire.Create(doc, wire_type.Id, view.Id, WiringType.Arc, points, None, None)
+    except Exception as ex:
+        return None, first_error or ex
+    if conn is not None:
+        try:
+            wire.ConnectTo(conn, None)
+        except Exception:
+            pass
+    return wire, None
 
 
 try:

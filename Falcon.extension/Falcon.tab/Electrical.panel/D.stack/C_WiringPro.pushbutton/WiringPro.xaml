@@ -78,6 +78,9 @@
                         <CheckBox x:Name="pick_last" Margin="0,6,0,0">
                             <TextBlock TextWrapping="Wrap" Text="Also pick the LAST outlet. Off: pick only the first, the end of the run is chosen for you"/>
                         </CheckBox>
+                        <CheckBox x:Name="as_wires" Margin="0,6,0,0">
+                            <TextBlock TextWrapping="Wrap" Text="Draw the run as Revit wires (the Wire type below) instead of detail lines. Same square routing; the wires show in wire schedules."/>
+                        </CheckBox>
                     </StackPanel>
                 </Border>
 
@@ -100,7 +103,7 @@
                         <TextBlock Text="Wire type:" Foreground="#6B7385" FontSize="10.5" Margin="0,6,0,2"/>
                         <ComboBox x:Name="wire_type" Height="24"/>
                         <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
-                                   Text="Needs the first outlet to be on a circuit. If the tag does not show a circuit, tick &quot;Create a power circuit&quot; above."/>
+                                   Text="A Wire Tag goes on the home-run wire and reads Panel/Circuit (for example DB-GF-02/R2), like Revit's own home runs; any other tag type goes on the first outlet. Needs the first outlet to be on a circuit: tick &quot;Create a power circuit&quot; above."/>
                     </StackPanel>
                 </Border>
             </StackPanel>

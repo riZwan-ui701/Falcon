@@ -22,3 +22,6 @@ distribution system, a lighting-fixture circuit tag and a wire type loaded.
 | 12 | Wall, Back box | Lines join the back-box circles |
 | 13 | Fixtures already on a circuit, circuit ticked | "every outlet is already on a circuit"; lines still drawn |
 | 14 | Ctrl+Z | Whole run undone (lines, circuit, wire, tag) |
+| 15 | Tag type = a Wire Tag | Home-run arc wire with an arrow from the first outlet toward the panel; tag on it reads Panel/Circuit, e.g. DB-GF-02/R2 |
+| 16 | Tag type = a fixture tag | Tag at the first outlet; report suggests a Wire Tag |
+| 17 | Tick "Draw the run as Revit wires" | Same square routing drawn as wires of the chosen type; report says "Revit wire(s) (XHHW)" |
