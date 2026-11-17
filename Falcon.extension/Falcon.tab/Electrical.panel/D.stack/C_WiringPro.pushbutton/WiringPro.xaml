@@ -1,0 +1,116 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Wiring Pro" Width="420" Height="700" MinHeight="420"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False" Background="#F3F5F9">
+    <Window.Resources>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="BorderBrush" Value="#E1E5EE"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        <Style x:Key="Head" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#6B7385"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#6B7385"/>
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="20,0,0,6"/>
+        </Style>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" Background="#1B2540" Padding="16,12,16,14">
+            <StackPanel>
+                <TextBlock Text="Wiring Pro" Foreground="White" FontWeight="Bold" FontSize="20"/>
+                <TextBlock Text="Connect a run of outlets with wiring, a circuit and a tag"
+                           Foreground="#C5CCDB" FontSize="11"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="14,12,14,0">
+            <StackPanel>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="OUTLET TYPE" Style="{StaticResource Head}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="out_ceiling" GroupName="out" Content="Ceiling" Margin="0,0,24,0" Checked="outlet_changed"/>
+                            <RadioButton x:Name="out_wall" GroupName="out" Content="Wall" Checked="outlet_changed"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="WIRE COLOR" Style="{StaticResource Head}"/>
+                        <RadioButton x:Name="color_style" GroupName="color" Content="Line style"/>
+                        <ComboBox x:Name="line_style" Height="24" Margin="20,4,0,8"/>
+                        <RadioButton x:Name="color_phase" GroupName="color" Content="Phase color  (R red, Y yellow, B blue)"/>
+                        <TextBlock Style="{StaticResource Hint}" Text="Taken from the circuit of each outlet. Outlets without a circuit use:"/>
+                        <ComboBox x:Name="default_phase" Height="22" Width="60" HorizontalAlignment="Left" Margin="20,0,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="CONNECTION" Style="{StaticResource Head}"/>
+                        <StackPanel x:Name="ceiling_conn">
+                            <CheckBox x:Name="custom_point">
+                                <TextBlock TextWrapping="Wrap" Text="Custom connection point (click it on one fixture). Off: lines join the middle of the fixtures' sides"/>
+                            </CheckBox>
+                        </StackPanel>
+                        <StackPanel x:Name="wall_conn">
+                            <RadioButton x:Name="conn_outlet" GroupName="wallconn" Content="Outlet to outlet"/>
+                            <TextBlock Style="{StaticResource Hint}" Text="The line goes into an outlet at one point beside its stub and leaves from the other point, then runs to the next outlet."/>
+                            <RadioButton x:Name="conn_backbox" GroupName="wallconn" Content="Back box"/>
+                            <TextBlock Style="{StaticResource Hint}" Text="The line goes from a circle of the back box to a circle of the next outlet's back box. An outlet already entered on one circle leaves from the other one."/>
+                        </StackPanel>
+                        <CheckBox x:Name="pick_last" Margin="0,6,0,0">
+                            <TextBlock TextWrapping="Wrap" Text="Also pick the LAST outlet. Off: pick only the first, the end of the run is chosen for you"/>
+                        </CheckBox>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="CIRCUIT" Style="{StaticResource Head}"/>
+                        <CheckBox x:Name="make_circuit" Content="Create a power circuit on panel:"/>
+                        <ComboBox x:Name="panel" Height="24" Margin="0,4,0,4"/>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,0"
+                                   Text="Revit assigns the circuit number (for example R4); the wire color then follows its phase letter. The panel schedule lists the connected fixtures."/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="TAG" Style="{StaticResource Head}"/>
+                        <CheckBox x:Name="add_tag" Content="ADD TAG: arc wire to the panel + circuit tag at the first outlet"/>
+                        <TextBlock Text="Tag type:" Foreground="#6B7385" FontSize="10.5" Margin="0,6,0,2"/>
+                        <ComboBox x:Name="tag_type" Height="24"/>
+                        <TextBlock Text="Wire type:" Foreground="#6B7385" FontSize="10.5" Margin="0,6,0,2"/>
+                        <ComboBox x:Name="wire_type" Height="24"/>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                   Text="Needs the first outlet to be on a circuit. If the tag does not show a circuit, tick &quot;Create a power circuit&quot; above."/>
+                    </StackPanel>
+                </Border>
+                <TextBlock x:Name="error" Foreground="Firebrick" TextWrapping="Wrap" Margin="2,0,0,8"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="14,8,14,12">
+            <Button Content="Cancel" Width="90" Height="28" Margin="0,0,8,0" IsCancel="True" Click="cancel_click"/>
+            <Button Content="Start" Width="100" Height="28" IsDefault="True" Click="ok_click"
+                    Background="#1B2540" Foreground="White" BorderBrush="#1B2540"/>
+        </StackPanel>
+    </Grid>
+</Window>

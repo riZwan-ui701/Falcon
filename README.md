@@ -15,7 +15,7 @@ The **Falcon** tab uses compact small buttons, stacked three high. Panels run
 | Panel | Column 1 | Column 2 | Column 3 | Column 4 |
 |---|---|---|---|---|
 | **Parameters** | Add Param (large) | | | |
-| **Electrical** | Connect Conduit, Convert Line, Multi Fillet | Junction Box, Pull Box, Conduit Cutter | Auto Dimension, Home Run, Line Cutter | Auto Flex, Home Run Guide |
+| **Electrical** | Connect Conduit, Convert Line, Multi Fillet | Junction Box, Pull Box, Conduit Cutter | Auto Dimension, Home Run, Line Cutter | Auto Flex, Home Run Guide, Wiring Pro |
 | **Graphics** | Coloring, **Markup ▾** (Redline Markup, Blue Markup, Clear) | | | |
 
 ## Markup (Graphics panel → Markup ▾)
@@ -106,6 +106,33 @@ parameter values in the project. The dialog remembers the last data type and
 group.
 
 ## Electrical panel
+
+### Wiring Pro (plan views)
+Wires a run of outlets and does the paperwork. The dialog (remembered):
+
+- **Outlet type** — Ceiling (lighting fixtures) or Wall (sockets, switches,
+  data, fire alarm … devices).
+- **Wire color** — a line style, or **phase color** (R red, Y yellow, B blue)
+  taken from each outlet's circuit number; outlets without a circuit use the
+  letter you choose.
+- **Connection** — Ceiling: lines join the **middle of the fixtures' sides**,
+  or tick **Custom connection point** and click it on one fixture — the same
+  point is used on every fixture (it follows each fixture's rotation). Wall:
+  **Outlet to outlet** (in at one point beside the stub, out at the other) or
+  **Back box** (circle to circle of the back boxes). **Also pick the LAST
+  outlet** lets you fix the end of the run.
+- **Circuit** — create a power circuit on the chosen panel; Revit numbers it
+  (e.g. R4) and the panel's schedule lists the fixtures (a panel schedule is
+  made if the panel has none).
+- **Tag** — an arc home-run wire toward the panel and a circuit tag at the
+  first outlet, so drawing and schedule stay in sync.
+
+Then box-select the outlets (Finish; pre-selected ones are kept) and click the
+**first** outlet (and the **last**, if ticked). The tool finds the shortest run
+through the rest and draws horizontal/vertical detail lines only — each
+fixture has one line in and one line out, and no line runs over another
+fixture. The report gives lines drawn, colors, the circuit, schedule and tag.
+One undo step.
 
 ### Home Run Guide (plan views)
 Draw the main route (the trunk) from the panel with detail lines, and a
@@ -306,6 +333,7 @@ Falcon.extension/
       D.stack/
         A_AutoFlex.pushbutton/
         B_HomeRunGuide.pushbutton/
+        C_WiringPro.pushbutton/
     Graphics.panel/
       A.stack/
         A_Coloring.pushbutton/
@@ -318,8 +346,8 @@ Falcon.extension/
     bundle.yaml                     (panel order)
   lib/
     falcon_markup.py               (Markup tools)
-    falcon_geom.py, falcon_route.py, falcon_layout.py, falcon_naming.py,
-    falcon_params.py
+    falcon_geom.py, falcon_route.py, falcon_layout.py, falcon_wiring.py,
+    falcon_naming.py, falcon_params.py
                                    (pure - tested offline)
     falcon_conduit.py, falcon_color.py        (Revit conduit and colour helpers)
     falcon_settings.py                   (remembered settings)
@@ -335,7 +363,7 @@ can't open files whose full path is longer than 260 characters, and
 ## Offline tests
 
 The maths behind Pull Box, Conduit Cutter, Auto Flex, Home Run Guide,
-Junction Box, Auto Dimension,
+Junction Box, Auto Dimension, Wiring Pro,
 Convert Line and Connect Conduit, and the Add Param rules, run without Revit:
 
 ```

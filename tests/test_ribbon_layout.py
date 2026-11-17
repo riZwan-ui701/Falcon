@@ -47,7 +47,7 @@ def test_electrical_stacks_in_order():
         ["Connect Conduit", "Convert Line", "Multi Fillet"],
         ["Junction Box", "Pull Box", "Conduit Cutter"],
         ["Auto Dimension", "Home Run", "Line Cutter"],
-        ["Auto Flex", "Home Run Guide"],
+        ["Auto Flex", "Home Run Guide", "Wiring Pro"],
     ]
 
 
@@ -80,7 +80,7 @@ def test_every_button_is_complete():
             assert {"script.py", "bundle.yaml", "icon.png"} <= set(files), root
         if root.endswith(".pulldown"):
             assert {"bundle.yaml", "icon.png"} <= set(files), root
-    assert found == 16
+    assert found == 17
 
 
 def test_paths_fit_windows_limit_in_main_folder():
