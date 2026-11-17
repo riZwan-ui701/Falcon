@@ -117,7 +117,7 @@
                     <StackPanel>
                         <TextBlock Text="SWITCH" Style="{StaticResource Head}"/>
                         <CheckBox x:Name="add_switch">
-                            <TextBlock TextWrapping="Wrap" Text="Add a light switch to this run: after the lights, click the switch (Esc skips it). It is wired to the nearest light in the same style and color."/>
+                            <TextBlock TextWrapping="Wrap" Text="Add a light switch to this run (lighting only): after the lights, click the switch (Esc skips it). It is wired to the nearest light in the same style and color. Power runs (sockets) never ask for a switch."/>
                         </CheckBox>
                         <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
                             <TextBlock Text="Switch ID:" Foreground="#6B7385" FontSize="10.5" VerticalAlignment="Center" Margin="0,0,8,0"/>

@@ -7,7 +7,7 @@
 #                  a power circuit on a panel (with its panel schedule), an
 #                  arc home-run wire and a circuit tag at the first outlet.
 # Author         : Rizwan Zahid
-# Version        : 1.1.0
+# Version        : 1.1.1
 # Created Date   : 2026-11-17
 # Updated Date   : 2026-11-17
 # Status         : Production
@@ -48,6 +48,11 @@
 #
 # Changelog
 # ------------------------------------------------------------
+# v1.1.1
+#   - No <unnamed> circuits: a panel-less circuit is connected to the chosen
+#     panel; a new circuit is created and connected all-or-nothing.
+#   - The light switch is asked for only on lighting runs; power (socket)
+#     runs never ask for a switch.
 # v1.1.0
 # - Light switch: wired to the nearest light; same Switch ID on the
 #   switch and the run (auto = next free letter)
@@ -417,20 +422,58 @@ def circuits_of(el):
             if s.SystemType == ElectricalSystemType.PowerCircuit]
 
 
-def make_circuit(outlets, panel):
-    """(circuit or None, note)."""
+def panel_refused(panel_name, ex):
+    return (u"Revit would not connect the circuit to {} ({}). Check that the "
+            u"panel's distribution system matches the lights' voltage and number "
+            u"of poles, and that the panel has a free slot.".format(panel_name, ex))
+
+
+def make_circuit(outlets, panel, panel_name):
+    """Put the outlets on a circuit of `panel`.
+
+    - A circuit an outlet is already on that has NO panel (Revit shows it as
+      <unnamed>) is connected to the panel.
+    - Outlets on no circuit get a new circuit, created and connected in one
+      all-or-nothing step: if Revit refuses the panel, no panel-less circuit
+      is left behind.
+    Returns (created circuit or None, report lines)."""
+    notes = []
+    loose = {}
+    for o in outlets:
+        for system in circuits_of(o):
+            if system.BaseEquipment is None:
+                loose[eid_int(system.Id)] = system
+    for system in loose.values():
+        try:
+            falcon_conduit.all_or_nothing(doc, lambda: system.SelectPanel(panel))
+            doc.Regenerate()
+            notes.append(u"An existing circuit with no panel (<unnamed>) is now "
+                         u"connected to {} as {}.".format(panel_name, system.CircuitNumber))
+        except Exception as ex:
+            notes.append(panel_refused(panel_name, ex))
+
     free = [o for o in outlets if not circuits_of(o)]
-    if not free:
-        return None, u"every outlet is already on a circuit"
-    system = ElectricalSystem.Create(
-        doc, List[DB.ElementId]([o.Id for o in free]), ElectricalSystemType.PowerCircuit)
-    system.SelectPanel(panel)
-    doc.Regenerate()
-    note = u""
-    if len(free) < len(outlets):
-        note = u"{} outlet(s) were already on a circuit and kept it".format(
-            len(outlets) - len(free))
-    return system, note
+    created = None
+    if free:
+        def create():
+            system = ElectricalSystem.Create(
+                doc, List[DB.ElementId]([o.Id for o in free]),
+                ElectricalSystemType.PowerCircuit)
+            system.SelectPanel(panel)
+            return system
+        try:
+            created = falcon_conduit.all_or_nothing(doc, create)
+            doc.Regenerate()
+        except Exception as ex:
+            notes.append(panel_refused(panel_name, ex) + u" No circuit was created.")
+    elif not loose:
+        notes.append(u"Every outlet is already on a circuit of a panel - kept as it is.")
+    on_other = len(outlets) - len(free) - sum(
+        1 for o in outlets if any(eid_int(c.Id) in loose for c in circuits_of(o)))
+    if free and on_other > 0:
+        notes.append(u"{} outlet(s) were already on a panel circuit and kept it.".format(
+            on_other))
+    return created, notes
 
 
 def ensure_schedule(panel):
@@ -498,7 +541,8 @@ def main():
             local = host[0].GetTransform().Inverse.OfPoint(pt)
     except OperationCanceledException:
         return
-    switch = pick_switch() if o["add_switch"] else None
+    # switches control lights only - a socket / power run never asks for one
+    switch = pick_switch() if o["add_switch"] and is_lighting_run(outlets) else None
 
     rects = [plan_rect(x, view) for x in outlets]
     centers = [(x.Location.Point.X, x.Location.Point.Y) for x in outlets]
@@ -522,7 +566,7 @@ def main():
         with revit.Transaction("Falcon: Wiring Pro"):
             if o["make_circuit"]:
                 try:
-                    circuit, note = make_circuit(outlets, o["panel_el"])
+                    circuit, notes = make_circuit(outlets, o["panel_el"], o["panel"])
                     if circuit is not None:
                         report.append(u"Circuit {} created on {} for {} outlet(s).".format(
                             circuit.CircuitNumber, o["panel"], len(outlets)))
@@ -531,8 +575,7 @@ def main():
                         else:
                             report.append(u"The panel schedule of {} now lists them.".format(
                                 o["panel"]))
-                    if note:
-                        report.append(u"Circuit: {}.".format(note))
+                    report.extend(notes)
                 except Exception as ex:
                     report.append(u"Circuit not created: {}".format(ex))
 
@@ -586,6 +629,14 @@ def main():
         head.append(u"Line style: {}".format(o["style_name"]))
     head.append(u"Run order: {}.".format(o["run_order"]))
     forms.alert(u"\n".join(head + report), title=TITLE)
+
+
+def is_lighting_run(outlets):
+    """True when the run has light fixtures. Power runs (sockets, data,
+    fire alarm devices ...) have no switch."""
+    lights = int(DB.BuiltInCategory.OST_LightingFixtures)
+    return any(o.Category is not None and eid_int(o.Category.Id) == lights
+               for o in outlets)
 
 
 def pick_switch():
