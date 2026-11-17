@@ -32,7 +32,8 @@
             <CheckBox x:Name="also_3d" Content="Also apply in 3D views"/>
             <TextBlock Margin="20,2,0,12" TextWrapping="Wrap" FontSize="11" Foreground="Gray"
                        Text="Off by default: the color is not shown in 3D views, only in the other views and their templates."/>
-            <Button x:Name="choose_btn" Content="Choose color..." Height="30" Margin="0,0,0,8" Click="choose_click"/>
+            <Button x:Name="choose_btn" Content="Choose color..." Height="30" Margin="0,0,0,8" Click="choose_click"
+                    Background="#1B2540" Foreground="White" BorderBrush="#1B2540" FontWeight="SemiBold"/>
             <Button x:Name="remove_btn" Content="Remove color from selected" Height="26" Margin="0,0,0,8" Click="remove_click"/>
             <Button x:Name="remove_all_btn" Content="Remove all Coloring colors" Height="26" Click="remove_all_click"/>
         </StackPanel>

@@ -1,0 +1,8 @@
+title: Home Run Guide
+tooltip: >-
+  Draw one trunk route and the branch lines with detail lines, then run this:
+  select the trunk, set the spacing and click the panel-end marker. Every
+  branch gets its own offset lane along the trunk back to the panel, spaced
+  apart and arranged so nothing crosses. Preview first; one undo step.
+  Falcon.
+author: Rizwan Zahid

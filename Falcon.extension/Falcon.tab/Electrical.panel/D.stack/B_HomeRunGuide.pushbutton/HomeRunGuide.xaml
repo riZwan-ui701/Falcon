@@ -1,0 +1,98 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Falcon - Home Run" Width="420" SizeToContent="Height"
+        ResizeMode="NoResize" WindowStartupLocation="CenterScreen" ShowInTaskbar="False"
+        Background="#141B2D">
+    <Window.Resources>
+        <Style x:Key="Pill" TargetType="Border">
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style x:Key="PillText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#9AA6C0"/>
+        </Style>
+        <Style x:Key="Note" TargetType="Border">
+            <Setter Property="Background" Value="#22FFFFFF"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Border Margin="0" Padding="18,14,18,16">
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#1B2540" Offset="0"/>
+                <GradientStop Color="#2B2F63" Offset="0.6"/>
+                <GradientStop Color="#3A2A5C" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.Background>
+        <StackPanel>
+            <TextBlock Text="FALCON  /  HOME RUN" Foreground="#4FD1C5" FontWeight="Bold" FontSize="10"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,12">
+                <Border x:Name="pill1" Style="{StaticResource Pill}">
+                    <TextBlock x:Name="pill1_text" Text="1  SELECT" Style="{StaticResource PillText}"/>
+                </Border>
+                <Border x:Name="pill2" Style="{StaticResource Pill}">
+                    <TextBlock x:Name="pill2_text" Text="2  OFFSET" Style="{StaticResource PillText}"/>
+                </Border>
+                <Border x:Name="pill3" Style="{StaticResource Pill}">
+                    <TextBlock x:Name="pill3_text" Text="3  START" Style="{StaticResource PillText}"/>
+                </Border>
+            </StackPanel>
+
+            <!-- step 1 -->
+            <StackPanel x:Name="step1">
+                <TextBlock Text="Select Reference Line" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
+                <TextBlock Foreground="#B8C1D6" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="Select the main Detail Line route in Revit, then finish the selection."/>
+                <Border Style="{StaticResource Note}">
+                    <TextBlock Foreground="#DDE3F0" TextWrapping="Wrap" FontSize="11"
+                               Text="In Revit, select the connected Detail Line(s) that form the main route (the trunk). Click Finish when done. Branch lines of the same line style that touch the trunk become the home runs."/>
+                </Border>
+            </StackPanel>
+
+            <!-- step 2 -->
+            <StackPanel x:Name="step2">
+                <TextBlock Text="Set Offset" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
+                <TextBlock Foreground="#B8C1D6" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="Enter the spacing between the generated routes."/>
+                <Border Style="{StaticResource Note}">
+                    <StackPanel>
+                        <TextBlock Text="ROUTE SPACING" Foreground="#B8C1D6" FontSize="10" FontWeight="Bold"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <TextBox x:Name="spacing" Width="110" Height="28" FontSize="14"
+                                     TextAlignment="Right" Padding="4,3"
+                                     Background="#1B2540" Foreground="White" BorderBrush="#4FD1C5"/>
+                            <TextBlock Text="mm" Foreground="White" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </StackPanel>
+                        <TextBlock x:Name="error" Foreground="#FF8A80" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- step 3 -->
+            <StackPanel x:Name="step3">
+                <TextBlock Text="Pick Start Point" Foreground="White" FontSize="18" FontWeight="SemiBold"/>
+                <TextBlock Foreground="#B8C1D6" TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="Click one of the temporary square markers in the Revit view to choose the route direction."/>
+                <Border Style="{StaticResource Note}">
+                    <TextBlock Foreground="#DDE3F0" TextWrapping="Wrap" FontSize="11"
+                               Text="In Revit, click the square marker at the panel end. The routes run from each branch along the trunk to that point."/>
+                </Border>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="Cancel" Width="80" Height="28" Margin="0,0,8,0" IsCancel="True" Click="cancel_click"/>
+                <Button x:Name="go_button" Content="Continue to selection" MinWidth="140" Height="28" IsDefault="True"
+                        Background="#F5A524" Foreground="#141B2D" FontWeight="SemiBold" BorderBrush="#F5A524"
+                        Click="go_click"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

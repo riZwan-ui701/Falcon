@@ -4,7 +4,8 @@ Tested on Revit version: ______  pyRevit version: ______
 
 Setup: a junction box family with "box" in its name and **two conduit
 connectors** (a through / 2-way box) loaded; a conduit run from a panel with
-straight lengths and 90° elbows, total about 40 m with 3–4 bends.
+straight lengths and 90° elbows, total about 40 m with 3–4 bends, plus a
+bundle of 6+ parallel home runs leaving the same panel.
 
 | # | Do this | Expect |
 |---|---|---|
@@ -21,3 +22,7 @@ straight lengths and 90° elbows, total about 40 m with 3–4 bends.
 | 11 | Run on a run that already has a junction box in the middle | Count restarts after the existing box |
 | 12 | Use a box family with no connectors | Boxes placed on the conduit without cutting; message says so |
 | 13 | Run the tool again | Dialog shows the last values you used |
+| B1 | Start → select the whole bundle (window or Tab), Finish | Prompt "Click the start point (panel side). Distances are measured from here." |
+| B2 | Click near the panel | Every run gets its own boxes, measured from the panel end; report lists each run |
+| B3 | Click the start point at the far end instead | Runs measured from that end |
+| B4 | Pre-select conduits, then run | No conduit pick; goes straight to the start point |

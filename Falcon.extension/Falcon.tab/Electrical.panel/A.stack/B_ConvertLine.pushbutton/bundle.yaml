@@ -1,6 +1,8 @@
 title: Convert Line
 tooltip: >-
-  Turn straight model/detail lines or CAD lines into conduits on this
-  view's level, with elbows and couplings where lines touch. Arcs are
-  skipped. Falcon.
+  Turn detail lines into conduits in one click: pick lines, take every
+  line of a line style in the view, or pick CAD lines. Choose type, size
+  and a fixed elevation or Circuit Elevation (fixture height, rising out
+  of the panel top). Straight runs become one conduit; elbows, tees and
+  crosses where lines meet. Falcon.
 author: Rizwan Zahid

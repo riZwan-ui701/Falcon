@@ -1,6 +1,7 @@
 title: Pull Box
 tooltip: >-
-  Place pull boxes along a conduit run automatically: every 15 m (or your
-  spacing) and after every two 90-degree bends. Click the conduit at the
-  panel end. Falcon.
+  Set the spacing (15 m), bends before a box (2) and the box type, select
+  the conduits (a whole bundle at once), Finish, then click the start point
+  at the panel side. Each run gets a box every 15 m and after every two 90
+  degree bends; 2-way boxes cut and connect the conduit. Falcon.
 author: Rizwan Zahid

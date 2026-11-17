@@ -5,9 +5,9 @@
 # Purpose        : Color a whole family, one of its types, or picked
 #                  elements, so systems read clearly in plans and 3D.
 # Author         : Rizwan Zahid
-# Version        : 1.0.0
+# Version        : 2.0.0
 # Created Date   : 2026-11-12
-# Updated Date   : 2026-11-12
+# Updated Date   : 2026-11-17
 # Status         : Production
 #
 # Target Revit   : Revit 2020 - 2027
@@ -18,8 +18,10 @@
 # Discipline     : All Disciplines (built for Electrical)
 # Tool Type      : pyRevit Tool
 #
-# Input          : Color Family - families/types ticked in a list.
-#                  Color Element - pre-selection or picked elements.
+# Input          : Menu (comes back until Close). Color Family - families /
+#                  types ticked or clicked in a list. Color Element -
+#                  elements picked with Finish, filtered by category, then
+#                  a color.
 # Output         : Color Family - FALCON_COLOR_* view filters on project views
 #                  and their templates (3D optional).
 #                  Color Element - view overrides in the active view and
@@ -37,6 +39,10 @@
 #
 # Changelog
 # ------------------------------------------------------------
+# v2.0.0
+# - Menu window that comes back after each action until Close
+# - Click a family/type row to color it; status says how many elements match
+# - Color Element: pick (Finish), filter by category, then the color
 # v1.0.0
 # - Initial Release
 #
@@ -56,6 +62,8 @@ from System.Windows.Controls import (TreeViewItem, StackPanel, CheckBox,
                                      TextBlock, Orientation)
 from System.Windows.Shapes import Rectangle
 from System.Windows.Media import SolidColorBrush, Color as WColor, Brushes
+
+from System.Collections.Generic import List
 
 from pyrevit import revit, DB, forms, script
 from Autodesk.Revit.UI.Selection import ObjectType
@@ -96,15 +104,17 @@ class FamilyEntry(object):
         self.types.append((type_name, falcon_color.eid_int(type_id)))
 
 
-def used_type_ids():
-    used = set()
+def used_type_counts():
+    """{type id int: number of placed elements of that type}."""
+    used = {}
     for el in DB.FilteredElementCollector(doc).WhereElementIsNotElementType():
         try:
             tid = el.GetTypeId()
         except Exception:
             continue
         if tid is not None and tid != DB.ElementId.InvalidElementId:
-            used.add(falcon_color.eid_int(tid))
+            key = falcon_color.eid_int(tid)
+            used[key] = used.get(key, 0) + 1
     return used
 
 
@@ -144,10 +154,13 @@ class ColorFamilyWindow(forms.WPFWindow):
         forms.WPFWindow.__init__(
             self, os.path.join(os.path.dirname(__file__), "ColorFamily.xaml"))
         self.families = collect_families()
-        self.used = used_type_ids()
+        self.used = used_type_counts()
         self.checked = set()       # keys: (family, type or None)
+        self.category_of = dict((f.name, f.category_name) for f in self.families)
+        self.clicked = None        # key of the row clicked in the tree
         self.nodes = []
         self.colors = falcon_color.filter_colors(doc)
+        self.tree.SelectedItemChanged += self.row_clicked
         self.build_tree()
 
     # ---------- tree
@@ -170,6 +183,11 @@ class ColorFamilyWindow(forms.WPFWindow):
         panel.Children.Add(box)
         panel.Children.Add(swatch)
         panel.Children.Add(text)
+        if key[1] is None:
+            cat = TextBlock()
+            cat.Text = u"   ({})".format(self.category_of.get(key[0], u""))
+            cat.Foreground = Brushes.Gray
+            panel.Children.Add(cat)
         return panel
 
     def build_tree(self):
@@ -188,11 +206,12 @@ class ColorFamilyWindow(forms.WPFWindow):
                 if not types:
                     continue
             item = TreeViewItem()
+            item.Tag = (fam.name, None)
             item.Header = self._header(
-                (fam.name, None), u"{}   [{}]".format(fam.name, fam.category_name),
-                falcon_naming.filter_name(fam.name))
+                (fam.name, None), fam.name, falcon_naming.filter_name(fam.name))
             for type_name, _tid in sorted(types):
                 child = TreeViewItem()
+                child.Tag = (fam.name, type_name)
                 child.Header = self._header(
                     (fam.name, type_name), type_name,
                     falcon_naming.filter_name(fam.name, type_name))
@@ -207,12 +226,24 @@ class ColorFamilyWindow(forms.WPFWindow):
             self.checked.discard(sender.Tag)
         self.show_selected()
 
+    def row_clicked(self, sender, args):
+        item = self.tree.SelectedItem
+        self.clicked = getattr(item, "Tag", None) if item is not None else None
+        self.show_selected()
+
+    def chosen(self):
+        """Ticked rows, or the clicked row when nothing is ticked."""
+        if self.checked:
+            return set(self.checked)
+        return set([self.clicked]) if self.clicked else set()
+
     def show_selected(self):
-        if not self.checked:
+        chosen = self.chosen()
+        if not chosen:
             self.selected_text.Text = "Nothing selected"
             return
         lines = []
-        for fam, typ in sorted(self.checked, key=lambda k: (k[0], k[1] or "")):
+        for fam, typ in sorted(chosen, key=lambda k: (k[0], k[1] or "")):
             lines.append(u"Type: {} : {}".format(fam, typ) if typ else u"Family: {}".format(fam))
         self.selected_text.Text = "\n".join(lines)
 
@@ -220,14 +251,23 @@ class ColorFamilyWindow(forms.WPFWindow):
         """[(FamilyEntry, type name or None)] - a ticked family only counts
         when none of its types are ticked."""
         by_name = dict((f.name, f) for f in self.families)
-        typed = set(k[0] for k in self.checked if k[1] is not None)
+        chosen = self.chosen()
+        typed = set(k[0] for k in chosen if k[1] is not None)
         result = []
-        for fam, typ in self.checked:
+        for fam, typ in chosen:
             entry = by_name.get(fam)
             if entry is None or (typ is None and fam in typed):
                 continue
             result.append((entry, typ))
         return result
+
+    def matching(self, targets):
+        count = 0
+        for entry, typ in targets:
+            for type_name, tid in entry.types:
+                if typ is None or type_name == typ:
+                    count += self.used.get(tid, 0)
+        return count
 
     def refresh(self, message):
         self.colors = falcon_color.filter_colors(doc)
@@ -272,6 +312,7 @@ class ColorFamilyWindow(forms.WPFWindow):
         msg = u"Colored {} in {} view(s).".format(what, views_done)
         if not include_3d:
             msg += u" 3D views were left out."
+        msg += u" {} element(s) match.".format(self.matching(targets))
         if failures:
             msg += u" Skipped: " + u"; ".join(failures)
         self.refresh(msg)
@@ -306,41 +347,113 @@ class ColorFamilyWindow(forms.WPFWindow):
 
 # ------------------------------------------------------------ element mode
 
+class CategoryFilter(forms.WPFWindow):
+    """Untick the categories you do not want to color."""
+
+    def __init__(self, elements):
+        forms.WPFWindow.__init__(
+            self, os.path.join(os.path.dirname(__file__), "FilterSelection.xaml"))
+        self.result = None
+        self.by_cat = {}
+        for el in elements:
+            cat = el.Category
+            name = cat.Name if cat is not None else u"(no category)"
+            self.by_cat.setdefault(name, []).append(el)
+        self.intro.Text = (u"{} elements selected. Untick the categories you do not "
+                           u"want to color.".format(len(elements)))
+        self.checks = []
+        for name in sorted(self.by_cat):
+            box = CheckBox()
+            box.Content = u"{}  ({})".format(name, len(self.by_cat[name]))
+            box.Tag = name
+            box.IsChecked = True
+            box.Margin = Thickness(0, 2, 0, 2)
+            self.boxes.Children.Add(box)
+            self.checks.append(box)
+
+    def check_all(self, sender, args):
+        for box in self.checks:
+            box.IsChecked = True
+
+    def uncheck_all(self, sender, args):
+        for box in self.checks:
+            box.IsChecked = False
+
+    def ok_click(self, sender, args):
+        self.result = [el for box in self.checks if box.IsChecked
+                       for el in self.by_cat[box.Tag]]
+        self.Close()
+
+    def cancel_click(self, sender, args):
+        self.Close()
+
+
 def color_element_mode():
+    pre = List[DB.Reference]()
+    for eid in uidoc.Selection.GetElementIds():
+        el = doc.GetElement(eid)
+        if el is not None and el.Category is not None:
+            pre.Add(DB.Reference(el))
+    try:
+        refs = uidoc.Selection.PickObjects(
+            ObjectType.Element,
+            "Select the elements to color (Tab selects a connected run), then click "
+            "Finish. Linked models are ignored.", pre)
+    except OperationCanceledException:
+        return
+    elements = [doc.GetElement(r.ElementId) for r in refs]
+    elements = [e for e in elements if e is not None
+                and not isinstance(e, DB.RevitLinkInstance)]
+    if not elements:
+        return
+    picker = CategoryFilter(elements)
+    picker.show_dialog()
+    if not picker.result:
+        return
     color = falcon_color.pick_color()
     if color is None:
         return
-    total = 0
-    views_3d = 0
-    pre = list(uidoc.Selection.GetElementIds())
-    if pre:
-        with revit.Transaction("Falcon: Color Element"):
-            n, views_3d = falcon_color.color_elements(doc, pre, color)
-            total += n
-    while True:
-        try:
-            ref = uidoc.Selection.PickObject(
-                ObjectType.Element, "Pick elements to color (Esc to finish)")
-        except OperationCanceledException:
-            break
-        with revit.Transaction("Falcon: Color Element"):
-            n, views_3d = falcon_color.color_elements(doc, [ref.ElementId], color)
-            total += n
-    if total:
-        forms.alert(u'Colored {} element(s) in view "{}" and in {} 3D view(s).'.format(
-            total, doc.ActiveView.Name, views_3d), title=TITLE)
+    with revit.Transaction("Falcon: Color Element"):
+        total, views_3d = falcon_color.color_elements(
+            doc, [el.Id for el in picker.result], color)
+    forms.alert(u'Colored {} element(s) in view "{}" and in {} 3D view(s).'.format(
+        total, doc.ActiveView.Name, views_3d), title=TITLE)
 
 
 # ------------------------------------------------------------ main
+
+class ColoringMenu(forms.WPFWindow):
+    def __init__(self):
+        forms.WPFWindow.__init__(
+            self, os.path.join(os.path.dirname(__file__), "ColoringMenu.xaml"))
+        self.choice = None
+        self.element_text.Text = (
+            u"Pick elements in the model (a conduit, a tray, anything) and give them a "
+            u"color. Shows in the current view ({}) and in the 3D views.".format(
+                doc.ActiveView.Name))
+
+    def family_click(self, sender, args):
+        self.choice = "family"
+        self.Close()
+
+    def element_click(self, sender, args):
+        self.choice = "element"
+        self.Close()
+
+    def close_click(self, sender, args):
+        self.Close()
+
 
 if doc is None:
     forms.alert("Please open a Revit project first.", title=TITLE)
     script.exit()
 
-choice = forms.CommandSwitchWindow.show(
-    ["Color Family", "Color Element"], message="What do you want to color?")
-
-if choice == "Color Family":
-    ColorFamilyWindow().show_dialog()
-elif choice == "Color Element":
-    color_element_mode()
+while True:
+    menu = ColoringMenu()
+    menu.show_dialog()
+    if menu.choice == "family":
+        ColorFamilyWindow().show_dialog()
+    elif menu.choice == "element":
+        color_element_mode()
+    else:
+        break

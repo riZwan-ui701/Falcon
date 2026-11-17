@@ -346,6 +346,9 @@ def _set_offset_to(doc, inst, z):
     DB.ElementTransformUtils.MoveElement(doc, inst.Id, DB.XYZ(0, 0, delta))
 
 
+set_height = _set_offset_to
+
+
 def _rotate_about(doc, inst, point, angle):
     if abs(math.sin(angle)) > TOL or math.cos(angle) < 0:
         axis = DB.Line.CreateBound(point, point + DB.XYZ.BasisZ)
@@ -443,6 +446,48 @@ def connect_union(doc, c1, c2):
         return None
 
 
+def add_fitting(doc, kind, conns):
+    """Elbow / union / tee / cross on the given conduit end connectors
+    (tee: run, run, branch; cross: run pair, then the other pair).
+    Returns the fitting, or None when Revit can't fit it."""
+    try:
+        if kind == "elbow":
+            return doc.Create.NewElbowFitting(conns[0], conns[1])
+        if kind == "union":
+            return doc.Create.NewUnionFitting(conns[0], conns[1])
+        if kind == "tee":
+            return doc.Create.NewTeeFitting(conns[0], conns[1], conns[2])
+        if kind == "cross":
+            return doc.Create.NewCrossFitting(conns[0], conns[1], conns[2], conns[3])
+    except Exception:
+        return None
+    return None
+
+
+def conduit_sizes_mm(doc, ctype):
+    """Nominal sizes (mm) of the conduit type's standard, smallest first;
+    every standard's sizes when the type's standard can't be read."""
+    from Autodesk.Revit.DB.Electrical import ConduitSizeSettings
+    try:
+        settings = ConduitSizeSettings.GetConduitSizeSettings(doc)
+    except Exception:
+        return []
+    standard = None
+    for name in ("RBS_CONDUIT_STANDARD_TYPE_PARAM", "CONDUIT_STANDARD_TYPE_PARAM"):
+        bip = getattr(DB.BuiltInParameter, name, None)
+        param = ctype.get_Parameter(bip) if bip is not None else None
+        if param is not None and param.HasValue:
+            standard = param.AsValueString() or param.AsString()
+            break
+    found, every = [], []
+    for pair in settings:
+        sizes = [round(s.NominalDiameter * 304.8, 1) for s in pair.Value]
+        every.extend(sizes)
+        if standard is not None and pair.Key == standard:
+            found = sizes
+    return sorted(set(found or every))
+
+
 def set_middle_elevation(conduit, offset_ft):
     """Middle elevation of the conduit above its reference level."""
     conduit.get_Parameter(DB.BuiltInParameter.RBS_OFFSET_PARAM).Set(offset_ft)
@@ -513,3 +558,116 @@ def place_box_at_end(doc, symbol, conduit, end_point):
         return inst, False
     end_connector(conduit, end_point).ConnectTo(conn)
     return inst, True
+
+
+# ------------------------------------------------------------ auto flex
+
+def used_conduit_connectors(inst):
+    return [c for c in conduit_connectors(inst) if c.IsConnected]
+
+
+def count_conduit_connectors_as(doc, inst, type_id):
+    """How many conduit connectors inst would have as type type_id.
+
+    Tried inside a SubTransaction that is always rolled back, so nothing
+    changes. None when Revit refuses the type."""
+    sub = DB.SubTransaction(doc)
+    sub.Start()
+    try:
+        inst.ChangeTypeId(type_id)
+        doc.Regenerate()
+        return len(conduit_connectors(inst))
+    except Exception:
+        return None
+    finally:
+        sub.RollBack()
+
+
+def _match_links(inst, links, tol):
+    """{link index: box connector} when every link has a box connector
+    facing it on its conduit's line; None otherwise."""
+    free = list(conduit_connectors(inst))
+    found = {}
+    for i, (_eid, origin, facing) in enumerate(links):
+        best = None
+        for conn in free:
+            if conn.CoordinateSystem.BasisZ.DotProduct(facing.Negate()) < 0.999:
+                continue
+            lateral = (conn.Origin - origin).CrossProduct(facing).GetLength()
+            if lateral > tol:
+                continue
+            if best is None or lateral < best[0]:
+                best = (lateral, conn)
+        if best is None:
+            return None
+        found[i] = best[1]
+        free.remove(best[1])
+    return found
+
+
+def _lateral_shift(conn_origin, link_origin, facing):
+    """Move (perpendicular to the conduit) that puts conn on the line."""
+    d = link_origin - conn_origin
+    return d - facing.Multiply(d.DotProduct(facing))
+
+
+def swap_box_type(doc, inst, type_id, tol=0.01):
+    """Change a junction box to another type and keep its conduits on it.
+
+    The conduits are let go, the type is changed, the box is turned in
+    90 degree steps (and slid sideways if the new type's outlets sit a bit
+    differently) until every conduit has an outlet facing it, then each
+    conduit end is moved onto its outlet and connected again.
+    Raises ValueError when the new type can't take the existing conduits;
+    run it inside all_or_nothing so the box is left as it was."""
+    links = []
+    for conn in used_conduit_connectors(inst):
+        for other in connected_others(conn):
+            links.append((other.Owner.Id, other.Origin, other.CoordinateSystem.BasisZ))
+            conn.DisconnectFrom(other)
+    point = inst.Location.Point
+    inst.ChangeTypeId(type_id)
+    doc.Regenerate()
+    if not links:
+        return
+    axis = DB.Line.CreateBound(point, point + DB.XYZ.BasisZ)
+    matched = None
+    for turn in range(4):
+        if turn:
+            DB.ElementTransformUtils.RotateElement(doc, inst.Id, axis, math.pi / 2)
+            doc.Regenerate()
+        # slide onto the first conduit's line using an outlet that faces it
+        _eid, origin, facing = links[0]
+        facing_conns = [c for c in conduit_connectors(inst)
+                        if c.CoordinateSystem.BasisZ.DotProduct(facing.Negate()) > 0.999]
+        if facing_conns:
+            conn = min(facing_conns, key=lambda c: c.Origin.DistanceTo(origin))
+            shift = _lateral_shift(conn.Origin, origin, facing)
+            if shift.GetLength() > TOL:
+                DB.ElementTransformUtils.MoveElement(doc, inst.Id, shift)
+                doc.Regenerate()
+                point = inst.Location.Point
+                axis = DB.Line.CreateBound(point, point + DB.XYZ.BasisZ)
+        matched = _match_links(inst, links, tol)
+        if matched is not None:
+            break
+    if matched is None:
+        raise ValueError("the new type's outlets do not line up with the conduits")
+    for i, (eid, origin, _facing) in enumerate(links):
+        element = doc.GetElement(eid)
+        box_conn = matched[i]
+        target = box_conn.Origin
+        if is_conduit(element):
+            p0, p1 = ends(element)
+            if p0.DistanceTo(origin) <= p1.DistanceTo(origin):
+                set_ends(element, target, p1)
+            else:
+                set_ends(element, p0, target)
+            doc.Regenerate()
+            end_connector(element, target).ConnectTo(box_conn)
+        else:
+            near = [c for c in conduit_connectors(element)
+                    if not c.IsConnected and c.Origin.DistanceTo(target) < tol]
+            if not near:
+                raise ValueError("a fitting on the box can't reach the new outlet")
+            near[0].ConnectTo(box_conn)

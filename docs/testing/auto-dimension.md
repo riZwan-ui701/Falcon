@@ -2,8 +2,23 @@
 
 Tested on Revit version: ______  pyRevit version: ______
 
-Setup: plan with grids; a bundle of 3 parallel conduits near a grid; another
-bundle 8 m away; one conduit far from any grid but near a wall.
+Setup: plan with a grid of ceiling fixtures (rows and columns, some rotated
+90°), one fixture alone, one family with no centre reference planes.
+
+| # | Do this | Expect |
+|---|---|---|
+| 1 | Run from a 3D view | "Open a plan view first." |
+| 2 | Dialog "Select Dimension Style": Linear types only, "N styles" count | Tick **Show all styles** → every dimension style, count changes |
+| 3 | Pick a style, **Use Style**, select a row of 5 and a column of 2 (Finish) | One chain along the row, one along the column, through the fixture centres |
+| 4 | Read the report | "Dimensions created / Groups skipped / Segment values (mm): Row 1: 2406 / 1806 …" matching the chains |
+| 5 | Pre-select fixtures, then run | They stay selected in the pick |
+| 6 | Include the single fixture | Counted under Groups skipped |
+| 7 | Include the family with no centre references | Named under "Families missing usable center references" |
+| 8 | Rotated fixtures in a row | Still dimensioned (the other centre plane is used) |
+| 9 | Ctrl+Z | All chains removed |
+| 10 | Run again | Last style pre-selected |
+
+## Shift+click (original tool)
 
 | # | Do this | Expect |
 |---|---|---|

@@ -2,8 +2,24 @@
 
 Tested on Revit version: ______  pyRevit version: ______
 
-Setup: a 2-way (two conduit connectors) junction box family and a 1-connector
-end box family loaded; a few straight conduits.
+Setup: a lighting plan with detail-line routing between fixtures giving 1-, 2-
+(straight and 90°), 3- (T and Y) and 4-way junctions; a box family with types
+Terminal (1-way), Through (2-way 180), Angle (2-way 90), Tee (3-way),
+Branch_Y, Cross (4-way); one fixture no line touches.
+
+| # | Do this | Expect |
+|---|---|---|
+| 1 | Run from a 3D view | "Open the plan view with the routing lines first." |
+| 2 | Dialog: Elevation 3700 mm, "Millimeters above the level: <level>" | Start → "Select lighting fixtures, then click Finish" |
+| 3 | Select all fixtures, Finish | A box at each fixture insertion point at 3700 mm; types match the line pattern |
+| 4 | Look at Angle / Tee / Branch_Y boxes | Turned so their outlets face the lines |
+| 5 | Report | Placed N new / updated 0; elevation; family; types; the lonely fixture skipped with "no route line intersects the fixture outline; nearest line … mm …" |
+| 6 | Plan view | Zoomed to the placement points, same plan kept |
+| 7 | Change a line (a 2-way becomes a T), run again at 3650 | Existing boxes updated (type, turn, 3650), none doubled; "updated N existing box(es)" |
+| 8 | Routing drawn as wires or in a linked CAD | Same result |
+| 9 | Ctrl+Z | Whole run undone |
+
+## Shift+click (original tool)
 
 | # | Do this | Expect |
 |---|---|---|

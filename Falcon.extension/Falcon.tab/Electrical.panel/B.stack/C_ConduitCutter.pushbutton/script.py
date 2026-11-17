@@ -229,7 +229,8 @@ def main():
         u"Finished.",
         u"Created {} {} offset(s) covering {} crossing(s) with {:g}-degree elbows.".format(
             offsets, "upward" if going_up else "downward", crossings, angle),
-        u"Revit's conduit settings choose the fittings and minimum bend settings.",
+        u"Revit's conduit routing preferences determine the fittings and minimum "
+        u"bend settings.",
     ]
     if skipped:
         lines.append(u"Skipped:\n" + u"\n".join(skipped))

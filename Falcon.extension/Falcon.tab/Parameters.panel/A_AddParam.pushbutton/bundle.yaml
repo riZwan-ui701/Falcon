@@ -1,0 +1,7 @@
+title: Add Param
+tooltip: >-
+  Add a shared parameter to any loaded family without opening and editing
+  each family one by one. Tick a family for an instance parameter, or tick
+  types for a type parameter (with an optional value on those types).
+  Falcon.
+author: Rizwan Zahid
