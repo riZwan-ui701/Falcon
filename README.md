@@ -132,8 +132,11 @@ Wires a run of outlets and does the paperwork. The dialog (remembered):
   fixture, joined to the fixtures, bowed outwards like Revit's own wiring) or
   **Revit wires – Chamfer** (the square route as wires). The home run follows
   the same style.
+- **Start at the outlet nearest the panel** (on by default) — no click for
+  the first outlet: the run and its home run start at the light nearest the
+  DB. Off: you click the first outlet.
 - **Run order** — Shortest, **Clockwise** or **Anticlockwise** round the
-  outlets from the first one you click.
+  outlets from the first one.
 - No line runs along another one already drawn, and the tag is moved clear
   past the arrow tip so it never sits on the arrow or the wire.
 

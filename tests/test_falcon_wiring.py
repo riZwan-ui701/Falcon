@@ -226,7 +226,12 @@ def test_arc_polyline_passes_through_mid():
 
 def test_tag_size_estimate():
     w, h = estimate_tag_size(u"DB-GF-02/R2", 50)
-    assert w > h > 0 and w == pytest.approx(len("DB-GF-02/R2") * h * 0.75, rel=0.01)
+    assert w > h > 0 and w == pytest.approx(len("DB-GF-02/R2") * h * 0.85, rel=0.01)
+
+
+def test_nearest_to_panel():
+    from falcon_wiring import nearest_to
+    assert nearest_to(USER_ROOM, (100, -400)) == 4      # bottom-left is nearest the DB
 
 
 def test_lift_and_arc():

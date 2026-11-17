@@ -86,6 +86,9 @@
                             <RadioButton x:Name="conn_backbox" GroupName="wallconn" Content="Back box"/>
                             <TextBlock Style="{StaticResource Hint}" Text="The line goes from a circle of the back box to a circle of the next outlet's back box. An outlet already entered on one circle leaves from the other one."/>
                         </StackPanel>
+                        <CheckBox x:Name="auto_first" Margin="0,8,0,0">
+                            <TextBlock TextWrapping="Wrap" Text="Start at the outlet nearest the panel (no click) - the home run comes from it automatically. Off: you click the first outlet."/>
+                        </CheckBox>
                         <TextBlock Text="Run order" Foreground="#6B7385" FontSize="10.5" Margin="0,8,0,2"/>
                         <StackPanel Orientation="Horizontal">
                             <RadioButton x:Name="order_shortest" GroupName="order" Content="Shortest" Margin="0,0,16,0" Checked="order_changed"/>

@@ -81,7 +81,7 @@ DEFAULTS = {"outlet": "ceiling", "color_mode": "style", "style_name": "",
             "default_phase": "R", "custom_point": False, "wall_mode": "outlet",
             # "circuit_on" (not "make_circuit"): v1 saved False whenever the panel
             # list was empty, so that old saved value is ignored on purpose
-            "pick_last": True, "circuit_on": True, "panel": "", "add_tag": True,
+            "pick_last": True, "auto_first": True, "circuit_on": True, "panel": "", "add_tag": True,
             "tag_pick": "", "wire_type": "", "draw": "lines", "run_order": "shortest"}
 DRAW_MODES = ("lines", "arc", "chamfer")
 RUN_ORDERS = ("shortest", "clockwise", "anticlockwise")
@@ -186,6 +186,7 @@ class WiringDialog(forms.WPFWindow):
         (self.conn_backbox if s["wall_mode"] == "backbox" else self.conn_outlet).IsChecked = True
         self.custom_point.IsChecked = s["custom_point"]
         self.pick_last.IsChecked = s["pick_last"]
+        self.auto_first.IsChecked = s["auto_first"]
         self.saved_circuit_on = s["circuit_on"]
         self.warned_no_circuit = False
         self.make_circuit.IsChecked = s["circuit_on"] and bool(boards)
@@ -256,6 +257,7 @@ class WiringDialog(forms.WPFWindow):
             "custom_point": bool(self.custom_point.IsChecked),
             "wall_mode": "backbox" if self.conn_backbox.IsChecked else "outlet",
             "pick_last": bool(self.pick_last.IsChecked),
+            "auto_first": bool(self.auto_first.IsChecked),
             "make_circuit": circuit_on,
             # remember the user's tick - but not a box forced off by an empty
             # panel list
@@ -459,7 +461,14 @@ def main():
         if len(outlets) < 2:
             forms.alert("Select at least two outlets.", title=TITLE)
             return
-        first = pick_one(outlets, "Click the FIRST outlet (start of the run)")
+        board = home_panel(o, outlets)
+        if o["auto_first"] and board is not None:
+            # the home run starts at the outlet nearest the panel - no click
+            bp = board.Location.Point
+            first = falcon_wiring.nearest_to(
+                [(x.Location.Point.X, x.Location.Point.Y) for x in outlets], (bp.X, bp.Y))
+        else:
+            first = pick_one(outlets, "Click the FIRST outlet (start of the run)")
         last = (pick_one(outlets, "Click the LAST outlet (end of the run)")
                 if o["pick_last"] else None)
         local = None
@@ -604,6 +613,23 @@ def path_end_outlet(path):
     return path.end_outlet
 
 
+def home_panel(o, outlets):
+    """The panel the run is wired back to: the one chosen for the new
+    circuit, else the panel of a circuit the outlets are already on."""
+    board = o["panel_el"] if o["make_circuit"] else None
+    if board is None:
+        for x in outlets:
+            for system in circuits_of(x):
+                if system.BaseEquipment is not None:
+                    board = system.BaseEquipment
+                    break
+            if board is not None:
+                break
+    if board is not None and hasattr(board.Location, "Point"):
+        return board
+    return None
+
+
 def _inside(rect, pt):
     return rect[0] <= pt.X <= rect[2] and rect[1] <= pt.Y <= rect[3]
 
@@ -642,11 +668,22 @@ def add_tag(view, first, o, z):
     on_wire = wire is not None and is_wire_tag(o["tag"])
     host = wire if on_wire else first
     tip, before = pts[-1], pts[-2]
+    # put the tag clear past the arrow tip straight away, sized from the
+    # text it will show, so it is clear even if Revit cannot measure it
+    label_text = u"{}/{}".format(system.PanelName, system.CircuitNumber)
+    scale = max(view.Scale, 1)
+    est_w, est_h = [falcon_geom.mm_to_ft(v)
+                    for v in falcon_wiring.estimate_tag_size(label_text, scale)]
+    gap = falcon_geom.mm_to_ft(TAG_GAP_PAPER_MM) * scale
+    spot = falcon_wiring.tag_spot(before, tip, est_w, est_h, gap)
     try:
         tag = DB.IndependentTag.Create(doc, o["tag"].Id, view.Id, DB.Reference(host), False,
                                        DB.TagOrientation.Horizontal,
-                                       DB.XYZ(tip[0], tip[1], z))
-        place_clear(view, tag, before, tip, z)
+                                       DB.XYZ(spot[0], spot[1], z))
+        try:
+            place_clear(view, tag, before, tip, z)
+        except Exception as ex:
+            out.append(u"(Tag kept at its first spot: {})".format(ex))
         where = u"on the home-run wire" if on_wire else u"at the first outlet"
         label = u"{}/{}".format(system.PanelName, system.CircuitNumber)
         if out and out[0].startswith(u"Added"):
@@ -692,6 +729,8 @@ def place_clear(view, tag, before, tip, z):
         centre = (head.X, head.Y)
     gap = falcon_geom.mm_to_ft(TAG_GAP_PAPER_MM) * scale
     spot = falcon_wiring.tag_spot(before, tip, width, height, gap)
+    if not sane:
+        return                  # already placed from the estimate
     # the head point need not be the box centre: shift by the difference
     tag.TagHeadPosition = DB.XYZ(head.X + spot[0] - centre[0],
                                  head.Y + spot[1] - centre[1], head.Z)

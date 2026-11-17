@@ -456,12 +456,18 @@ def chamfer_home_run(start, toward, length):
     return [start, (start[0], start[1] + sy), (start[0] + sx, start[1] + sy)]
 
 
-def estimate_tag_size(text, scale, text_mm=2.5):
-    """Model-size (mm) estimate of a one-line tag when Revit cannot report
-    its box: text height on paper times the view scale, about 0.75 of the
-    height per character."""
+def estimate_tag_size(text, scale, text_mm=3.0):
+    """Model-size (mm) estimate of a one-line tag, generous on purpose:
+    text height on paper times the view scale, about 0.85 of the height
+    per character (wide fonts, bold, a box round the text)."""
     h = text_mm * max(scale, 1)
-    return max(len(text or u""), 1) * h * 0.75, h
+    return max(len(text or u""), 1) * h * 0.85, h
+
+
+def nearest_to(points, target):
+    """Index of the point nearest target (plan distance)."""
+    return min(range(len(points)),
+               key=lambda i: math.hypot(points[i][0] - target[0], points[i][1] - target[1]))
 
 
 def tag_spot(before, tip, width, height, gap):
