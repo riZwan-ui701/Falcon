@@ -32,6 +32,11 @@
 #   - Re-running replaces the masks it made before in this view
 #   - One undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -54,6 +59,7 @@ import falcon_conduit
 import falcon_color
 import falcon_view
 import falcon_settings
+import falcon_safety
 
 TITLE = "Falcon - Line Cutter"
 SECTION = "falcon_linecutter"
@@ -215,8 +221,7 @@ def make_mask(view, type_id, style, edge_style, center, lower, upper, along, acr
 
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     view = doc.ActiveView
     if not falcon_view.is_plan(view):

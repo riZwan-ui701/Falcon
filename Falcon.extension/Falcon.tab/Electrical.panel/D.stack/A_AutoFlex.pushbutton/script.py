@@ -72,6 +72,8 @@ DIAMETERS_MM = [20, 25, 32, 40, 50, 65, 80, 90, 100, 125, 150, 200, 250, 300]
 DEFAULTS = {"diameter_mm": 20}
 LEAD_MM = 150.0        # flex runs straight out of the outlet this far
 ON_OUTLET_MM = 5.0     # a flex end this close to an outlet = already has a flex
+FLEX_SYSTEM_WORDS = ("conduit", "flex", "elec")   # preferred piping system type names
+FLEX_COMMENT = "Flexible conduit - Falcon Auto Flex"
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -157,7 +159,13 @@ def flex_type_and_system():
     types = sorted(DB.FilteredElementCollector(doc).OfClass(FlexPipeType),
                    key=lambda t: ("round" not in falcon_conduit.element_name(t).lower(),
                                   falcon_conduit.element_name(t)))
-    systems = list(DB.FilteredElementCollector(doc).OfClass(PipingSystemType))
+    # Revit has no flex conduit, so the flex is a flex pipe. Prefer a piping
+    # system type set up for it (name says conduit / flex / electrical) so the
+    # flex stays out of plumbing and HVAC schedules and clash sets.
+    systems = sorted(DB.FilteredElementCollector(doc).OfClass(PipingSystemType),
+                     key=lambda s: (not any(w in falcon_conduit.element_name(s).lower()
+                                            for w in FLEX_SYSTEM_WORDS),
+                                    falcon_conduit.element_name(s)))
     return (types[0] if types else None), (systems[0] if systems else None)
 
 
@@ -294,6 +302,10 @@ def do_box(inst, targets, opts, cache):
     diameter = flex.get_Parameter(DB.BuiltInParameter.RBS_PIPE_DIAMETER_PARAM)
     if diameter is not None and not diameter.IsReadOnly:
         diameter.Set(falcon_geom.mm_to_ft(opts["diameter_mm"]))
+    # label it so electrical schedules / filters can find it as flex conduit
+    comments = flex.get_Parameter(DB.BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS)
+    if comments is not None and not comments.IsReadOnly:
+        comments.Set(FLEX_COMMENT)
     return switched
 
 

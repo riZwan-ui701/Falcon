@@ -10,6 +10,32 @@
 # Target Revit   : Revit 2020 - 2027
 # Platform       : pyRevit
 # Python Version : IronPython 2.7
+#
+# Category       : BIM Automation
+# Discipline     : Electrical
+# Tool Type      : pyRevit Tool (Shift+click of the button)
+#
+# Input          : Clearance (mm) and elbow angle (degrees).
+# Output         : Saved settings used by Conduit Cutter.
+#
+# Dependencies   :
+#   - pyRevit, Revit API
+#   - falcon_settings.py
+#
+# Features       :
+#   - Remembers clearance and offset angle
+#
+# Notes          :
+#   - Runs when the button is Shift+clicked; the normal click runs script.py.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#
+# Changelog
+# ------------------------------------------------------------
+# v1.0.0
+# - Initial Release
+#
+# License        : Proprietary
+# Copyright      : (c) Rizwan Zahid. All Rights Reserved
 # ============================================================
 
 from pyrevit import forms

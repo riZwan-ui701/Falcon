@@ -46,6 +46,16 @@ def eid_int(eid):
     return int(eid.IntegerValue)
 
 
+def eid_from(value):
+    """ElementId from a stored number on every Revit version: 64-bit ids
+    (Revit 2024+, detected by ElementId.Value) are built from an Int64,
+    older versions from an int."""
+    if hasattr(DB.ElementId, "Value"):
+        from System import Int64
+        return DB.ElementId(Int64(value))
+    return DB.ElementId(int(value))
+
+
 def pick_color(initial=None):
     """Revit's colour dialog. Returns DB.Color, or None if cancelled."""
     dlg = ColorSelectionDialog()

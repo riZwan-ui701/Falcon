@@ -32,6 +32,11 @@
 #   - Devices with no circuit/panel are listed, nothing drawn
 #   - One undo step for the whole run
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -51,6 +56,7 @@ import falcon_geom
 import falcon_conduit
 import falcon_view
 import falcon_settings
+import falcon_safety
 
 TITLE = "Falcon - Home Run"
 SECTION = "falcon_homerun"
@@ -111,8 +117,7 @@ def draw(view, device, length):
 
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     view = doc.ActiveView
     if not falcon_view.is_plan(view):

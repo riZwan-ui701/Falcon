@@ -32,6 +32,11 @@
 #   - Bundles of side-by-side conduits share one dimension string
 #   - One undo step
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -51,6 +56,7 @@ import falcon_geom
 import falcon_conduit
 import falcon_view
 import falcon_settings
+import falcon_safety
 
 TITLE = "Falcon - Auto Dimension"
 SECTION = "falcon_autodim"
@@ -178,8 +184,7 @@ def _make_dimension(view, members, lines, mid, u, n, ref, ref_across, along_offs
 
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     view = doc.ActiveView
     if not falcon_view.is_plan(view):

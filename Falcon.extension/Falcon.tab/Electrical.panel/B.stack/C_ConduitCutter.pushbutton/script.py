@@ -34,6 +34,11 @@
 #   - Conduits that cannot fit the offset are skipped and listed
 #   - Single undo step for the whole run
 #
+# Notes          :
+#   - Designed for production BIM workflows.
+#   - IronPython 2.7-safe, so it runs on every supported Revit version.
+#   - Project only: exits with a message in the Family Editor.
+#
 # Changelog
 # ------------------------------------------------------------
 # v1.0.0
@@ -52,6 +57,7 @@ from Autodesk.Revit.Exceptions import OperationCanceledException
 import falcon_geom
 import falcon_conduit
 import falcon_settings
+import falcon_safety
 
 TITLE = "Falcon - Conduit Cutter"
 SECTION = "falcon_cutter"
@@ -164,8 +170,7 @@ def choose_movers(groups, runs):
 
 
 def main():
-    if doc is None:
-        forms.alert("Please open a Revit project first.", title=TITLE)
+    if not falcon_safety.project_only(doc, TITLE):
         return
     settings = falcon_settings.load(SECTION, DEFAULTS)
     clearance = falcon_geom.mm_to_ft(settings["clearance_mm"])

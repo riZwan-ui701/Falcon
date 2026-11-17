@@ -387,6 +387,9 @@ python -m venv .venv
 
 The Revit side is checked by hand with the lists in `docs/testing/`.
 
+Skills audits (pyRevit build rules, Revit 2020–2027 API differences,
+electrical practice) are written up in `docs/audit/`.
+
 ## Compatibility
 
 IronPython 2.7-safe. The Markup tools only use APIs unchanged across Revit
