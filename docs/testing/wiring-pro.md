@@ -34,3 +34,6 @@ distribution system, a lighting-fixture circuit tag and a wire type loaded.
 | 24 | Same, press Esc at the switch click | Run finishes without a switch |
 | 25 | Type Switch ID "S1" | S1 on the switch and lights |
 | 26 | Switch borrowed by another user (workshared) | "Switch … skipped: it is borrowed by …" |
+| 27 | Wall mode on sockets only, "Add a light switch" ticked | No switch click is asked; run finishes without a switch |
+| 28 | Lights already on a circuit with no panel (shown as \<unnamed\>), panel chosen | The circuit is connected to the panel; tag reads Panel/Circuit, never \<unnamed\> |
+| 29 | Panel Revit refuses (wrong voltage/poles or no free slot) | Pop-up explains why; no \<unnamed\> circuit is left behind |
