@@ -1,8 +1,9 @@
 import pytest
 
-from falcon_wiring import (order_run, side_mid, hits, orthogonal_options,
-                           route_sides, route_points, wall_ports, enter_leave,
-                           axis_of, phase_letter, lift, arc_points)
+from falcon_wiring import (order_run, order_ring, side_mid, hits, overlaps,
+                           orthogonal_options, route_sides, route_points,
+                           wall_ports, enter_leave, axis_of, phase_letter, lift,
+                           arc_points, arc_between, chamfer_home_run, tag_spot)
 
 
 def rect(cx, cy, half=0.5):
@@ -117,6 +118,70 @@ def test_axis_of():
 ])
 def test_phase_letter(number, letter):
     assert phase_letter(number) == letter
+
+
+def test_order_ring_both_ways():
+    # 2 x 4 ring like the user's room: top row y=1, bottom row y=0
+    pts = [(0, 1), (1, 1), (2, 1), (3, 1), (0, 0), (1, 0), (2, 0), (3, 0)]
+    cw = order_ring(pts, 0, clockwise=True)
+    ccw = order_ring(pts, 0, clockwise=False)
+    assert cw == [0, 1, 2, 3, 7, 6, 5, 4]
+    assert ccw == [0, 4, 5, 6, 7, 3, 2, 1]
+
+
+def test_overlaps_counts_running_along_not_crossing():
+    drawn = [((0, 0), (10, 0))]
+    assert overlaps([(2, 0), (5, 0)], drawn) == 1
+    assert overlaps([(5, -3), (5, 3)], drawn) == 0
+    assert overlaps([(10, 0), (12, 0)], drawn) == 0   # touching end only
+
+
+def test_route_sides_avoids_lines_already_drawn():
+    a, b = rect(0, 0), rect(4, 0)
+    drawn = [((0.5, 0), (3.5, 0))]                     # straight E-W already used
+    path, _sa, _sb = route_sides(a, b, [], drawn=drawn)
+    assert overlaps(path, drawn) == 0
+
+
+def test_user_layout_routes_are_clean():
+    # the user's screenshot: 2 rows of 4 fixtures, run clockwise
+    H = 26
+    centres = [(x, -139) for x in (246, 455, 713, 921)] + \
+              [(x, -346) for x in (246, 455, 713, 921)]
+    rects = [(cx - H, cy - H, cx + H, cy + H) for cx, cy in centres]
+    order = order_ring(centres, 0, clockwise=True)
+    drawn, entered = [], {}
+    for a, b in zip(order, order[1:]):
+        others = [rects[k] for k in order if k not in (a, b)]
+        path, _sa, sb = route_sides(rects[a], rects[b], others,
+                                    used_a=entered.get(a), drawn=drawn)
+        entered[b] = sb
+        assert hits(path, others) == 0
+        assert overlaps(path, drawn) == 0
+        assert is_orthogonal(path)
+        drawn.extend(zip(path, path[1:]))
+
+
+def test_arc_between_bulges_away_from_centre():
+    pts = arc_between((0, 0), (4, 0), away_from=(2, 5))
+    assert pts[1][1] < 0          # centre is above, so the arc bows down
+    pts = arc_between((0, 0), (4, 0), away_from=(2, -5))
+    assert pts[1][1] > 0
+
+
+def test_chamfer_home_run_square_corners():
+    pts = chamfer_home_run((0, 0), (-10, 2), 1.0)
+    assert len(pts) == 3 and is_orthogonal(pts)
+    assert pts[1][0] < 0 and pts[2][1] > 0
+
+
+def test_tag_spot_clear_past_the_arrow_tip():
+    # arrow pointing left: tag centre sits left of the tip by gap + half width
+    spot = tag_spot((0, 0), (-1, 0), width=4, height=1, gap=0.5)
+    assert spot == pytest.approx((-3.5, 0))
+    # pointing down: clear by gap + half height
+    spot = tag_spot((0, 0), (0, -1), width=4, height=1, gap=0.5)
+    assert spot == pytest.approx((0, -2))
 
 
 def test_lift_and_arc():

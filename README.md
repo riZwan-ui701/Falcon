@@ -128,8 +128,14 @@ Wires a run of outlets and does the paperwork. The dialog (remembered):
   circuit tag. Pick a **Wire Tag** (listed first) and it goes on the home-run
   wire, reading Panel/Circuit (e.g. `DB-GF-02/R2`) like Revit's own home runs;
   any other tag type goes on the first outlet.
-- **Draw the run as Revit wires** (optional) — the same square routing, drawn
-  as wires of the chosen wire type instead of detail lines.
+- **Draw as** — detail lines (square), **Revit wires – Arc** (fixture to
+  fixture, joined to the fixtures, bowed outwards like Revit's own wiring) or
+  **Revit wires – Chamfer** (the square route as wires). The home run follows
+  the same style.
+- **Run order** — Shortest, **Clockwise** or **Anticlockwise** round the
+  outlets from the first one you click.
+- No line runs along another one already drawn, and the tag is moved clear
+  past the arrow tip so it never sits on the arrow or the wire.
 
 Then box-select the outlets (Finish; pre-selected ones are kept) and click the
 **first** outlet (and the **last**, if ticked). The tool finds the shortest run

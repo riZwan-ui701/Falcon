@@ -82,7 +82,10 @@ DEFAULTS = {"outlet": "ceiling", "color_mode": "style", "style_name": "",
             # "circuit_on" (not "make_circuit"): v1 saved False whenever the panel
             # list was empty, so that old saved value is ignored on purpose
             "pick_last": True, "circuit_on": True, "panel": "", "add_tag": True,
-            "tag_pick": "", "wire_type": "", "as_wires": False}
+            "tag_pick": "", "wire_type": "", "draw": "lines", "run_order": "shortest"}
+DRAW_MODES = ("lines", "arc", "chamfer")
+RUN_ORDERS = ("shortest", "clockwise", "anticlockwise")
+TAG_GAP_PAPER_MM = 2.5     # space between the arrow tip and the tag
 HOME_RUN_MM = 1200.0
 CEILING_CATEGORIES = (DB.BuiltInCategory.OST_LightingFixtures,)
 WALL_CATEGORIES = (
@@ -188,7 +191,11 @@ class WiringDialog(forms.WPFWindow):
         self.make_circuit.IsChecked = s["circuit_on"] and bool(boards)
         self.make_circuit.IsEnabled = bool(boards)
         self.add_tag.IsChecked = s["add_tag"]
-        self.as_wires.IsChecked = s["as_wires"]
+        draw = s["draw"] if s["draw"] in DRAW_MODES else "lines"
+        getattr(self, "draw_" + draw).IsChecked = True
+        order = s["run_order"] if s["run_order"] in RUN_ORDERS else "shortest"
+        getattr(self, "order_" + order).IsChecked = True
+        self.order_changed(None, None)
         (self.out_wall if s["outlet"] == "wall" else self.out_ceiling).IsChecked = True
         self.outlet_changed(None, None)
 
@@ -196,6 +203,22 @@ class WiringDialog(forms.WPFWindow):
         wall = bool(self.out_wall.IsChecked)
         self.wall_conn.Visibility = Visibility.Visible if wall else Visibility.Collapsed
         self.ceiling_conn.Visibility = Visibility.Collapsed if wall else Visibility.Visible
+
+    def order_changed(self, sender, args):
+        # the LAST outlet only matters for the shortest run
+        self.pick_last.IsEnabled = bool(self.order_shortest.IsChecked)
+
+    def draw_mode(self):
+        for m in DRAW_MODES:
+            if getattr(self, "draw_" + m).IsChecked:
+                return m
+        return "lines"
+
+    def run_order(self):
+        for m in RUN_ORDERS:
+            if getattr(self, "order_" + m).IsChecked:
+                return m
+        return "shortest"
 
     def _pick(self, combo, items):
         i = combo.SelectedIndex
@@ -206,10 +229,11 @@ class WiringDialog(forms.WPFWindow):
         board = self._pick(self.panel, self.boards)
         tag = self._pick(self.tag_type, self.tags)
         wire = self._pick(self.wire_type, self.wires)
-        if self.color_style.IsChecked and style[1] is None and not self.as_wires.IsChecked:
+        draw = self.draw_mode()
+        if self.color_style.IsChecked and style[1] is None and draw == "lines":
             self.error.Text = "There are no line styles to use."
             return
-        if self.as_wires.IsChecked and wire[1] is None:
+        if draw != "lines" and wire[1] is None:
             self.error.Text = "Pick a Wire type (Tag section) to draw the run as Revit wires."
             return
         if self.add_tag.IsChecked and (tag[1] is None or wire[1] is None):
@@ -240,7 +264,7 @@ class WiringDialog(forms.WPFWindow):
             "panel": board[0], "panel_el": board[1],
             "add_tag": bool(self.add_tag.IsChecked),
             "tag_pick": tag[0], "tag": tag[1], "wire_type": wire[0], "wire": wire[1],
-            "as_wires": bool(self.as_wires.IsChecked),
+            "draw": draw, "run_order": self.run_order(),
         }
         self.Close()
 
@@ -295,8 +319,12 @@ def pick_one(outlets, prompt):
 
 # ------------------------------------------------------------- geometry
 
-def plan_rect(el):
-    box = el.get_BoundingBox(None)
+def plan_rect(el, view=None):
+    """Plan outline of the fixture as drawn in the view (its symbol), not
+    its 3D body, so side middles sit on the symbol you see."""
+    box = el.get_BoundingBox(view) if view is not None else None
+    if box is None:
+        box = el.get_BoundingBox(None)
     return (box.Min.X, box.Min.Y, box.Max.X, box.Max.Y)
 
 
@@ -308,16 +336,20 @@ def plan_unit(v):
 def ceiling_paths(outlets, order, rects, local):
     paths = []
     entered = {}
+    drawn = []
     for a, b in zip(order, order[1:]):
         others = [rects[k] for k in order if k not in (a, b)]
         if local is not None:
             pa = outlets[a].GetTransform().OfPoint(local)
             pb = outlets[b].GetTransform().OfPoint(local)
-            paths.append((a, falcon_wiring.route_points((pa.X, pa.Y), (pb.X, pb.Y), others)))
+            path = falcon_wiring.route_points((pa.X, pa.Y), (pb.X, pb.Y), others, drawn=drawn)
+            drawn.extend(zip(path, path[1:]))
+            paths.append((a, path))
             continue
         path, _sa, sb = falcon_wiring.route_sides(rects[a], rects[b], others,
-                                                  used_a=entered.get(a))
+                                                  used_a=entered.get(a), drawn=drawn)
         entered[b] = sb
+        drawn.extend(zip(path, path[1:]))
         paths.append((a, path))
     return paths
 
@@ -332,6 +364,7 @@ def wall_paths(outlets, order, rects, mode):
             0.3 * size, mode, front=0.3 * size))
     paths = []
     came = None
+    drawn = []
     for n, (a, b) in enumerate(zip(order, order[1:])):
         nxt = outlets[b].Location.Point
         if n == 0:
@@ -342,7 +375,10 @@ def wall_paths(outlets, order, rects, mode):
         entry_b, _exit = falcon_wiring.enter_leave(ports[b], exit_a)
         others = [rects[k] for k in order if k not in (a, b)]
         axis = falcon_wiring.axis_of(plan_unit(outlets[a].HandOrientation))
-        paths.append((a, falcon_wiring.route_points(exit_a, entry_b, others, first_axis=axis)))
+        path = falcon_wiring.route_points(exit_a, entry_b, others, first_axis=axis,
+                                          drawn=drawn)
+        drawn.extend(zip(path, path[1:]))
+        paths.append((a, path))
         came = entry_b
     return paths
 
@@ -429,7 +465,7 @@ def main():
         local = None
         if not wall and o["custom_point"]:
             pt = uidoc.Selection.PickPoint("Click the connection point on one of the fixtures")
-            host = [x for x in outlets if _inside(plan_rect(x), pt)]
+            host = [x for x in outlets if _inside(plan_rect(x, view), pt)]
             if not host:
                 forms.alert("That point is not on one of the selected fixtures.", title=TITLE)
                 return
@@ -437,10 +473,16 @@ def main():
     except OperationCanceledException:
         return
 
-    rects = [plan_rect(x) for x in outlets]
+    rects = [plan_rect(x, view) for x in outlets]
     centers = [(x.Location.Point.X, x.Location.Point.Y) for x in outlets]
-    order = falcon_wiring.order_run(centers, first, last)
-    if wall:
+    if o["run_order"] == "shortest":
+        order = falcon_wiring.order_run(centers, first, last)
+    else:
+        order = falcon_wiring.order_ring(centers, first,
+                                         clockwise=o["run_order"] == "clockwise")
+    if o["draw"] == "arc":
+        paths = arc_paths(outlets, order, centers)
+    elif wall:
         paths = wall_paths(outlets, order, rects, o["wall_mode"])
     else:
         paths = ceiling_paths(outlets, order, rects, local)
@@ -476,10 +518,8 @@ def main():
                     letter = falcon_wiring.phase_letter(number, o["default_phase"]) \
                         if number else o["default_phase"]
                     color = DB.Color(*falcon_wiring.PHASE_RGB[letter])
-                if o["as_wires"]:
-                    # one Revit wire per connection, square corners kept
-                    wire = Wire.Create(doc, o["wire"].Id, view.Id, WiringType.Chamfer,
-                                       List[DB.XYZ]([DB.XYZ(*p) for p in pts]), None, None)
+                if o["draw"] != "lines":
+                    wire = draw_wire(view, o, outlets, a, path, pts)
                     if color is not None:
                         ogs = DB.OverrideGraphicSettings()
                         ogs.SetProjectionLineColor(color)
@@ -500,14 +540,62 @@ def main():
             if o["add_tag"]:
                 report.extend(add_tag(view, outlets[order[0]], o, z))
 
-    what = u"Revit wire(s) ({})".format(o["wire_type"]) if o["as_wires"] else u"detail line(s)"
+    what = {"lines": u"detail line(s)",
+            "arc": u"arc Revit wire(s) ({})".format(o["wire_type"]),
+            "chamfer": u"chamfer Revit wire(s) ({})".format(o["wire_type"])}[o["draw"]]
     head = [u"{} {} connecting {} {} outlet(s).".format(
         lines_made, what, len(outlets), word)]
     if o["color_mode"] == "phase":
         head.append(u"Phase color (R red, Y yellow, B blue)")
-    elif not o["as_wires"]:
+    elif o["draw"] == "lines":
         head.append(u"Line style: {}".format(o["style_name"]))
+    head.append(u"Run order: {}.".format(o["run_order"]))
     forms.alert(u"\n".join(head + report), title=TITLE)
+
+
+def arc_paths(outlets, order, centers):
+    """Revit-style arcs from fixture to fixture (connector to connector),
+    bowed away from the middle of the run."""
+    mid = (sum(c[0] for c in centers) / len(centers),
+           sum(c[1] for c in centers) / len(centers))
+    paths = []
+    for a, b in zip(order, order[1:]):
+        pa, pb = connector_xy(outlets[a]), connector_xy(outlets[b])
+        paths.append((a, ArcPath(falcon_wiring.arc_between(pa, pb, mid), b)))
+    return paths
+
+
+class ArcPath(list):
+    """Arc points that also remember which outlet they end at."""
+
+    def __init__(self, points, end_outlet):
+        list.__init__(self, points)
+        self.end_outlet = end_outlet
+
+
+def connector_xy(el):
+    conn = electrical_connector(el)
+    p = conn.Origin if conn is not None else el.Location.Point
+    return (p.X, p.Y)
+
+
+def draw_wire(view, o, outlets, a, path, pts):
+    """One Revit wire for one connection. Arc wires are joined to both
+    fixtures' connectors like Revit's own wiring; chamfer wires keep the
+    square side-to-side route."""
+    points = List[DB.XYZ]([DB.XYZ(*p) for p in pts])
+    if o["draw"] == "arc":
+        b = path_end_outlet(path)
+        start, end = electrical_connector(outlets[a]), electrical_connector(outlets[b])
+        try:
+            return Wire.Create(doc, o["wire"].Id, view.Id, WiringType.Arc, points, start, end)
+        except Exception:
+            return Wire.Create(doc, o["wire"].Id, view.Id, WiringType.Arc, points, None, None)
+    return Wire.Create(doc, o["wire"].Id, view.Id, WiringType.Chamfer, points, None, None)
+
+
+def path_end_outlet(path):
+    return path.end_outlet
 
 
 def _inside(rect, pt):
@@ -529,11 +617,16 @@ def add_tag(view, first, o, z):
     toward = ((panel.Location.Point.X, panel.Location.Point.Y)
               if panel is not None and hasattr(panel.Location, "Point")
               else (start[0] - 1.0, start[1] + 1.0))
-    pts = falcon_wiring.arc_points(start, toward, falcon_geom.mm_to_ft(HOME_RUN_MM))
+    length = falcon_geom.mm_to_ft(HOME_RUN_MM)
+    chamfer = o["draw"] == "chamfer"
+    pts = (falcon_wiring.chamfer_home_run(start, toward, length) if chamfer
+           else falcon_wiring.arc_points(start, toward, length))
     out = []
-    wire, problem = home_run_wire(view, o["wire"], pts, conn, z)
+    wire, problem = home_run_wire(view, o["wire"], pts, conn, z,
+                                  WiringType.Chamfer if chamfer else WiringType.Arc)
     if wire is not None:
-        out.append(u"Added a home-run arc wire toward panel {}".format(system.PanelName))
+        out.append(u"Added a home-run {} wire toward panel {}".format(
+            u"chamfer" if chamfer else u"arc", system.PanelName))
     else:
         out.append(u"Home-run wire not added: {}".format(problem))
 
@@ -542,11 +635,12 @@ def add_tag(view, first, o, z):
     # goes on the first outlet.
     on_wire = wire is not None and is_wire_tag(o["tag"])
     host = wire if on_wire else first
-    end = pts[-1]
-    spot = DB.XYZ(end[0] + 0.15 * (end[0] - start[0]), end[1] + 0.15 * (end[1] - start[1]), z)
+    tip, before = pts[-1], pts[-2]
     try:
-        DB.IndependentTag.Create(doc, o["tag"].Id, view.Id, DB.Reference(host), False,
-                                 DB.TagOrientation.Horizontal, spot)
+        tag = DB.IndependentTag.Create(doc, o["tag"].Id, view.Id, DB.Reference(host), False,
+                                       DB.TagOrientation.Horizontal,
+                                       DB.XYZ(tip[0], tip[1], z))
+        place_clear(view, tag, before, tip, z)
         where = u"on the home-run wire" if on_wire else u"at the first outlet"
         label = u"{}/{}".format(system.PanelName, system.CircuitNumber)
         if out and out[0].startswith(u"Added"):
@@ -566,7 +660,24 @@ def is_wire_tag(symbol):
     return cat is not None and eid_int(cat.Id) == int(DB.BuiltInCategory.OST_WireTags)
 
 
-def home_run_wire(view, wire_type, pts, conn, z):
+def place_clear(view, tag, before, tip, z):
+    """Move the tag so its whole box sits past the arrow tip, with a small
+    gap - never over the arrow or the wire."""
+    doc.Regenerate()
+    box = tag.get_BoundingBox(view)
+    if box is None:
+        return
+    width, height = box.Max.X - box.Min.X, box.Max.Y - box.Min.Y
+    gap = falcon_geom.mm_to_ft(TAG_GAP_PAPER_MM) * max(view.Scale, 1)
+    spot = falcon_wiring.tag_spot(before, tip, width, height, gap)
+    head = tag.TagHeadPosition
+    centre = ((box.Min.X + box.Max.X) / 2.0, (box.Min.Y + box.Max.Y) / 2.0)
+    # the head point need not be the box centre: shift by the difference
+    tag.TagHeadPosition = DB.XYZ(head.X + spot[0] - centre[0],
+                                 head.Y + spot[1] - centre[1], head.Z)
+
+
+def home_run_wire(view, wire_type, pts, conn, z, kind=None):
     """Arc wire from the first outlet toward the panel, connected at the
     outlet end so Revit treats it as a home run (arrow at the free end).
     Returns (wire or None, reason it failed)."""
@@ -575,12 +686,13 @@ def home_run_wire(view, wire_type, pts, conn, z):
     first_error = None
     if conn is not None:
         try:
-            return Wire.Create(doc, wire_type.Id, view.Id, WiringType.Arc,
+            return Wire.Create(doc, wire_type.Id, view.Id, kind or WiringType.Arc,
                                points, conn, None), None
         except Exception as ex:
             first_error = ex
     try:
-        wire = Wire.Create(doc, wire_type.Id, view.Id, WiringType.Arc, points, None, None)
+        wire = Wire.Create(doc, wire_type.Id, view.Id, kind or WiringType.Arc,
+                           points, None, None)
     except Exception as ex:
         return None, first_error or ex
     if conn is not None:

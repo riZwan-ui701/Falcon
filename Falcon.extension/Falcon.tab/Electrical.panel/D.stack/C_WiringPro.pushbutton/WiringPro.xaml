@@ -52,6 +52,17 @@
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
+                        <TextBlock Text="DRAW AS" Style="{StaticResource Head}"/>
+                        <RadioButton x:Name="draw_lines" GroupName="draw" Content="Detail lines (square, side middle to side middle)"/>
+                        <RadioButton x:Name="draw_arc" GroupName="draw" Content="Revit wires - Arc (like Revit's own wiring)" Margin="0,4,0,0"/>
+                        <RadioButton x:Name="draw_chamfer" GroupName="draw" Content="Revit wires - Chamfer (square route)" Margin="0,4,0,0"/>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,4,0,0"
+                                   Text="Revit wires use the Wire type in the Tag section and show in wire schedules; arc wires are joined to the fixtures. The home run follows the same style."/>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
                         <TextBlock Text="WIRE COLOR" Style="{StaticResource Head}"/>
                         <RadioButton x:Name="color_style" GroupName="color" Content="Line style"/>
                         <ComboBox x:Name="line_style" Height="24" Margin="20,4,0,8"/>
@@ -75,11 +86,16 @@
                             <RadioButton x:Name="conn_backbox" GroupName="wallconn" Content="Back box"/>
                             <TextBlock Style="{StaticResource Hint}" Text="The line goes from a circle of the back box to a circle of the next outlet's back box. An outlet already entered on one circle leaves from the other one."/>
                         </StackPanel>
-                        <CheckBox x:Name="pick_last" Margin="0,6,0,0">
-                            <TextBlock TextWrapping="Wrap" Text="Also pick the LAST outlet. Off: pick only the first, the end of the run is chosen for you"/>
-                        </CheckBox>
-                        <CheckBox x:Name="as_wires" Margin="0,6,0,0">
-                            <TextBlock TextWrapping="Wrap" Text="Draw the run as Revit wires (the Wire type below) instead of detail lines. Same square routing; the wires show in wire schedules."/>
+                        <TextBlock Text="Run order" Foreground="#6B7385" FontSize="10.5" Margin="0,8,0,2"/>
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="order_shortest" GroupName="order" Content="Shortest" Margin="0,0,16,0" Checked="order_changed"/>
+                            <RadioButton x:Name="order_clockwise" GroupName="order" Content="Clockwise" Margin="0,0,16,0" Checked="order_changed"/>
+                            <RadioButton x:Name="order_anticlockwise" GroupName="order" Content="Anticlockwise" Checked="order_changed"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,4"
+                                   Text="Clockwise / Anticlockwise go round the outlets from the first one you click."/>
+                        <CheckBox x:Name="pick_last" Margin="0,2,0,0">
+                            <TextBlock TextWrapping="Wrap" Text="Also pick the LAST outlet (Shortest only). Off: pick only the first, the end of the run is chosen for you"/>
                         </CheckBox>
                     </StackPanel>
                 </Border>

@@ -67,6 +67,25 @@ def order_run(points, first, last=None):
     return order
 
 
+def order_ring(points, first, clockwise=True):
+    """Visit order going round the outlets clockwise (or anticlockwise),
+    starting at `first`: sorted by angle around their centre."""
+    n = len(points)
+    if n == 0:
+        return []
+    cx = sum(p[0] for p in points) / float(n)
+    cy = sum(p[1] for p in points) / float(n)
+    start = math.atan2(points[first][1] - cy, points[first][0] - cx)
+    sign = -1.0 if clockwise else 1.0
+
+    def turn(i):
+        a = math.atan2(points[i][1] - cy, points[i][0] - cx)
+        d = (sign * (a - start)) % (2 * math.pi)
+        return (round(d, 9), math.hypot(points[i][0] - cx, points[i][1] - cy))
+    rest = sorted((i for i in range(n) if i != first), key=turn)
+    return [first] + rest
+
+
 # ------------------------------------------------------------- outlines
 
 def side_mid(rect, side):
@@ -149,9 +168,32 @@ def _arrives(path, side):
     return d[0] * f[0] + d[1] * f[1] < -1e-9 and abs(d[0] * f[1] - d[1] * f[0]) < 1e-9
 
 
-def _score(path, obstacles):
+def overlaps(path, drawn, tol=1e-6):
+    """How many legs of path run along (on top of) an already drawn
+    horizontal / vertical segment. Crossing at a point does not count."""
+    count = 0
+    for a, b in zip(path, path[1:]):
+        for c, d in drawn:
+            if abs(a[1] - b[1]) < 1e-9 and abs(c[1] - d[1]) < 1e-9 and abs(a[1] - c[1]) <= tol:
+                lo, hi = max(min(a[0], b[0]), min(c[0], d[0])), min(max(a[0], b[0]), max(c[0], d[0]))
+            elif abs(a[0] - b[0]) < 1e-9 and abs(c[0] - d[0]) < 1e-9 and abs(a[0] - c[0]) <= tol:
+                lo, hi = max(min(a[1], b[1]), min(c[1], d[1])), min(max(a[1], b[1]), max(c[1], d[1]))
+            else:
+                continue
+            if hi - lo > tol:
+                count += 1
+    return count
+
+
+def _self_overlaps(path):
+    legs = list(zip(path, path[1:]))
+    return sum(overlaps([a, b], legs[:i - 1]) for i, (a, b) in enumerate(legs) if i > 1)
+
+
+def _score(path, obstacles, drawn=()):
     length = sum(_manhattan(a, b) for a, b in zip(path, path[1:]))
-    return (hits(path, obstacles), len(path), length)
+    return (hits(path, obstacles), overlaps(path, drawn) + _self_overlaps(path),
+            len(path), length)
 
 
 def _near(rects, box, pad):
@@ -176,14 +218,15 @@ def _detours(pa, fa, pb, fb, rects, gap):
         yield [pa, a1, (x, a1[1]), (x, b1[1]), b1, pb]
 
 
-def route_sides(rect_a, rect_b, obstacles, used_a=None):
+def route_sides(rect_a, rect_b, obstacles, used_a=None, drawn=()):
     """Line from the middle of a side of fixture A to the middle of a side
     of fixture B, horizontal / vertical only.
 
     It leaves A straight out of a side and enters B straight into a side,
     never uses A's `used_a` side again (one line in, one line out), and
     avoids the other fixtures (`obstacles`) - going around them on a lane
-    just clear of them when needed. Fewest fixtures crossed wins, then
+    just clear of them when needed - and never runs along a line already
+    `drawn`. Fewest fixtures crossed wins, then fewest overlaps, then
     fewest bends, then shortest. Returns (points, side_a, side_b)."""
     size = max(rect_a[2] - rect_a[0], rect_a[3] - rect_a[1],
                rect_b[2] - rect_b[0], rect_b[3] - rect_b[1])
@@ -205,7 +248,7 @@ def route_sides(rect_a, rect_b, obstacles, used_a=None):
                 path = _clean(raw)
                 if not (_leaves(path, sa) and _arrives(path, sb)):
                     continue
-                key = _score(path, blockers)
+                key = _score(path, blockers, drawn)
                 if best is None or key < best[0]:
                     best = (key, path, sa, sb)
     if best is None:            # nothing clean: plain L between centres
@@ -215,15 +258,16 @@ def route_sides(rect_a, rect_b, obstacles, used_a=None):
     return best[1], best[2], best[3]
 
 
-def route_points(pa, pb, obstacles, first_axis=None):
+def route_points(pa, pb, obstacles, first_axis=None, drawn=()):
     """Horizontal / vertical line between two fixed points (custom
-    connection points, wall outlet ports). `first_axis` "x" or "y" breaks
-    ties in favour of starting along that axis."""
+    connection points, wall outlet ports), clear of the fixtures and of
+    lines already `drawn`. `first_axis` "x" or "y" breaks ties in favour of
+    starting along that axis."""
     box = (min(pa[0], pb[0]), min(pa[1], pb[1]), max(pa[0], pb[0]), max(pa[1], pb[1]))
     span = max(box[2] - box[0], box[3] - box[1], 1e-6)
     nearby = _near(obstacles, box, 0.5 * span)
     raws = list(orthogonal_options(pa, pb))
-    if hits(raws[0], nearby):
+    if hits(raws[0], nearby) or overlaps(raws[0], drawn):
         gap = 0.1 * span
         for r in nearby:
             for y in (r[1] - gap, r[3] + gap):
@@ -233,7 +277,7 @@ def route_points(pa, pb, obstacles, first_axis=None):
     best = None
     for raw in raws:
         path = _clean(raw)
-        key = list(_score(path, nearby))
+        key = list(_score(path, nearby, drawn))
         if first_axis and len(path) > 1:
             along_x = abs(path[1][1] - path[0][1]) < 1e-9
             key.insert(1, 0 if (first_axis == "x") == along_x else 1)
@@ -285,6 +329,41 @@ def phase_letter(circuit_number, default="R"):
 
 def lift(path, z):
     return [(p[0], p[1], z) for p in path]
+
+
+def arc_between(a, b, away_from, bulge=0.2):
+    """Three points of a Revit-style arc wire from a to b, bowed away from
+    `away_from` (the middle of the run), so arcs bulge outwards."""
+    mx, my = (a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    d = math.hypot(dx, dy) or 1.0
+    nx, ny = -dy / d, dx / d
+    if (mx - away_from[0]) * nx + (my - away_from[1]) * ny < 0:
+        nx, ny = -nx, -ny
+    return [a, (mx + nx * d * bulge, my + ny * d * bulge), b]
+
+
+def chamfer_home_run(start, toward, length):
+    """Home run with square corners: along the main axis toward the panel,
+    then a short leg across. Three points."""
+    dx, dy = toward[0] - start[0], toward[1] - start[1]
+    if abs(dx) >= abs(dy):
+        sx = math.copysign(length * 0.7, dx or 1.0)
+        sy = math.copysign(length * 0.3, dy or 1.0)
+        return [start, (start[0] + sx, start[1]), (start[0] + sx, start[1] + sy)]
+    sy = math.copysign(length * 0.7, dy or 1.0)
+    sx = math.copysign(length * 0.3, dx or 1.0)
+    return [start, (start[0], start[1] + sy), (start[0] + sx, start[1] + sy)]
+
+
+def tag_spot(before, tip, width, height, gap):
+    """Where to put a tag of size width x height so it sits clear past the
+    arrow tip, in the direction the last leg (before -> tip) points."""
+    dx, dy = tip[0] - before[0], tip[1] - before[1]
+    d = math.hypot(dx, dy) or 1.0
+    ux, uy = dx / d, dy / d
+    reach = gap + abs(ux) * width / 2.0 + abs(uy) * height / 2.0
+    return (tip[0] + ux * reach, tip[1] + uy * reach)
 
 
 def arc_points(start, toward, length, bulge=0.25):
