@@ -22,7 +22,9 @@ import math
 
 SIDES = ("E", "W", "N", "S")
 _FACING = {"E": (1, 0), "W": (-1, 0), "N": (0, 1), "S": (0, -1)}
-PHASE_RGB = {"R": (255, 0, 0), "Y": (255, 200, 0), "B": (0, 90, 255)}
+# true red, yellow and blue (R / Y / B = L1 / L2 / L3)
+PHASE_RGB = {"R": (255, 0, 0), "Y": (255, 255, 0), "B": (0, 0, 255)}
+PHASE_NAME = {"R": "red", "Y": "yellow", "B": "blue"}
 
 
 def _manhattan(a, b):
@@ -358,11 +360,39 @@ def axis_of(vector):
 
 def phase_letter(circuit_number, default="R"):
     """R / Y / B from a circuit number such as "R4" or "Y12"."""
+    letter = number_phase(circuit_number)
+    return letter if letter is not None else default
+
+
+def number_phase(circuit_number):
+    """R / Y / B when the circuit number starts with one (prefixed circuit
+    naming, e.g. "Y2"); None otherwise ("2", "L2", "")."""
     for ch in (circuit_number or ""):
         if ch.isalpha():
             ch = ch.upper()
-            return ch if ch in PHASE_RGB else default
-    return default
+            return ch if ch in PHASE_RGB else None
+    return None
+
+
+def load_phase(load_a, load_b, load_c):
+    """R / Y / B from where a single-phase circuit's load sits: phase A is
+    R (L1), B is Y (L2), C is B (L3). None when no load or the load is
+    spread over more than one phase."""
+    loads = [(load_a or 0.0, "R"), (load_b or 0.0, "Y"), (load_c or 0.0, "B")]
+    used = [p for v, p in loads if abs(v) > 1e-9]
+    return used[0] if len(used) == 1 else None
+
+
+def circuit_phase(circuit_number, loads, default="R"):
+    """Phase letter of a circuit: from its number first, then from its
+    per-phase loads, else the default. Returns (letter, how it was found)."""
+    letter = number_phase(circuit_number)
+    if letter is not None:
+        return letter, "number"
+    letter = load_phase(*loads) if loads else None
+    if letter is not None:
+        return letter, "load"
+    return default, "default"
 
 
 def lift(path, z):

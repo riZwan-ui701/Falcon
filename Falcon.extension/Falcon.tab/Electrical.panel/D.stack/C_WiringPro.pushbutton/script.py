@@ -518,21 +518,19 @@ def main():
                 except Exception as ex:
                     report.append(u"Circuit not created: {}".format(ex))
 
+            phases = {}             # circuit label -> (letter, how found)
+            if o["color_mode"] == "phase":
+                doc.Regenerate()    # loads and numbers of the new circuit
             for a, path in paths:
                 pts = falcon_wiring.lift(path, z)
                 color = None
                 if o["color_mode"] == "phase":
-                    systems = circuits_of(outlets[a])
-                    number = systems[0].CircuitNumber if systems else ""
-                    letter = falcon_wiring.phase_letter(number, o["default_phase"]) \
-                        if number else o["default_phase"]
+                    letter, label, how = phase_of(outlets[a], o["default_phase"])
+                    phases[label] = (letter, how)
                     color = DB.Color(*falcon_wiring.PHASE_RGB[letter])
                 if o["draw"] != "lines":
                     wire = draw_wire(view, o, outlets, a, path, pts)
-                    if color is not None:
-                        ogs = DB.OverrideGraphicSettings()
-                        ogs.SetProjectionLineColor(color)
-                        view.SetElementOverrides(wire.Id, ogs)
+                    paint(view, wire, color)
                     lines_made += 1
                     continue
                 for p, q in zip(pts, pts[1:]):
@@ -540,10 +538,8 @@ def main():
                         view, DB.Line.CreateBound(DB.XYZ(*p), DB.XYZ(*q)))
                     if o["color_mode"] == "style" and o["style"] is not None:
                         line.LineStyle = o["style"]
-                    elif color is not None:
-                        ogs = DB.OverrideGraphicSettings()
-                        ogs.SetProjectionLineColor(color)
-                        view.SetElementOverrides(line.Id, ogs)
+                    else:
+                        paint(view, line, color)
                     lines_made += 1
 
             if o["add_tag"]:
@@ -555,11 +551,46 @@ def main():
     head = [u"{} {} connecting {} {} outlet(s).".format(
         lines_made, what, len(outlets), word)]
     if o["color_mode"] == "phase":
-        head.append(u"Phase color (R red, Y yellow, B blue)")
+        head.append(u"Phase color (R red, Y yellow, B blue):")
+        how_words = {"number": u"from the circuit number", "load": u"from its phase load",
+                     "default": u"no phase found - your default"}
+        for label in sorted(phases):
+            letter, how = phases[label]
+            head.append(u"   {}: {} {} ({})".format(
+                label, letter, falcon_wiring.PHASE_NAME[letter], how_words[how]))
     elif o["draw"] == "lines":
         head.append(u"Line style: {}".format(o["style_name"]))
     head.append(u"Run order: {}.".format(o["run_order"]))
     forms.alert(u"\n".join(head + report), title=TITLE)
+
+
+def phase_of(outlet, default):
+    """(letter, circuit label, how found) for the outlet's circuit: from the
+    circuit number (e.g. Y2), else from the phase that carries its load
+    (A = R, B = Y, C = B), else the default letter."""
+    systems = circuits_of(outlet)
+    if not systems:
+        return default, u"(no circuit)", "default"
+    system = systems[0]
+    loads = []
+    for name in ("ApparentLoadPhaseA", "ApparentLoadPhaseB", "ApparentLoadPhaseC"):
+        try:
+            loads.append(float(getattr(system, name)))
+        except Exception:
+            loads = None
+            break
+    letter, how = falcon_wiring.circuit_phase(system.CircuitNumber, loads, default)
+    label = u"{}/{}".format(system.PanelName or u"-", system.CircuitNumber)
+    return letter, label, how
+
+
+def paint(view, element, color):
+    """Projection line color override in this view (no-op without a color)."""
+    if element is None or color is None:
+        return
+    ogs = DB.OverrideGraphicSettings()
+    ogs.SetProjectionLineColor(color)
+    view.SetElementOverrides(element.Id, ogs)
 
 
 def arc_paths(outlets, order, centers, rects):
@@ -656,6 +687,9 @@ def add_tag(view, first, o, z):
     out = []
     wire, problem = home_run_wire(view, o["wire"], pts, conn, z,
                                   WiringType.Chamfer if chamfer else WiringType.Arc)
+    if wire is not None and o["color_mode"] == "phase":
+        letter = phase_of(first, o["default_phase"])[0]
+        paint(view, wire, DB.Color(*falcon_wiring.PHASE_RGB[letter]))
     if wire is not None:
         out.append(u"Added a home-run {} wire toward panel {}".format(
             u"chamfer" if chamfer else u"arc", system.PanelName))

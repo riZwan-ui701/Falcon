@@ -250,6 +250,22 @@ def test_nearest_to_panel():
     assert nearest_to(USER_ROOM, (100, -400)) == 4      # bottom-left is nearest the DB
 
 
+def test_phase_colors_are_true_red_yellow_blue():
+    from falcon_wiring import PHASE_RGB
+    assert PHASE_RGB == {"R": (255, 0, 0), "Y": (255, 255, 0), "B": (0, 0, 255)}
+
+
+def test_circuit_phase_from_number_then_load_then_default():
+    from falcon_wiring import circuit_phase
+    assert circuit_phase("Y2", (0, 0, 120), "R") == ("Y", "number")   # number wins
+    assert circuit_phase("2", (0, 0, 120), "R") == ("B", "load")      # phase C
+    assert circuit_phase("2", (0, 80, 0), "R") == ("Y", "load")       # phase B
+    assert circuit_phase("L2", (90, 0, 0), "Y") == ("R", "load")      # phase A
+    assert circuit_phase("2", (0, 0, 0), "Y") == ("Y", "default")     # no load
+    assert circuit_phase("2", (50, 50, 0), "B") == ("B", "default")   # 2-pole
+    assert circuit_phase("2", None, "R") == ("R", "default")
+
+
 def test_lift_and_arc():
     assert lift([(1, 2)], 5) == [(1, 2, 5)]
     pts = arc_points((0, 0), (10, 0), 2.0)
